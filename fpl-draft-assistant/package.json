@@ -7,7 +7,9 @@
   "scripts": {
     "build": "npm install --prefix client && npm run build --prefix client",
     "start": "node server.js",
-    "dev": "node server.js"
+    "dev": "node server.js",
+    "test": "node --test",
+    "check:mobile": "node scripts/mobile-check.mjs"
   },
   "engines": {
     "node": ">=18"
