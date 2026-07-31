@@ -1,0 +1,177 @@
+// One-off generator for lib/sample-data.json — a small realistic snapshot used
+// only when the live FPL Draft API is unreachable (demo/local development).
+// Run: node lib/make-sample.js
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+const teams = [
+  ["Arsenal", "ARS"], ["Aston Villa", "AVL"], ["Bournemouth", "BOU"],
+  ["Brentford", "BRE"], ["Brighton", "BHA"], ["Chelsea", "CHE"],
+  ["Crystal Palace", "CRY"], ["Everton", "EVE"], ["Fulham", "FUL"],
+  ["Leeds", "LEE"], ["Liverpool", "LIV"], ["Man City", "MCI"],
+  ["Man Utd", "MUN"], ["Newcastle", "NEW"], ["Nott'm Forest", "NFO"],
+  ["Sunderland", "SUN"], ["Spurs", "TOT"], ["West Ham", "WHU"],
+  ["Wolves", "WOL"], ["Burnley", "BUR"],
+].map(([name, short_name], i) => ({ id: i + 1, name, short_name, code: 100 + i }));
+
+const T = Object.fromEntries(teams.map((t) => [t.short_name, t.id]));
+
+// [web_name, first, second, teamShort, type, total_points, minutes, goals, assists, cs]
+const players = [
+  // Goalkeepers
+  ["Raya", "David", "Raya", "ARS", 1, 158, 3420, 0, 0, 16],
+  ["Alisson", "Alisson", "Becker", "LIV", 1, 142, 3060, 0, 0, 13],
+  ["Sánchez", "Robert", "Sánchez", "CHE", 1, 138, 3330, 0, 0, 12],
+  ["Pickford", "Jordan", "Pickford", "EVE", 1, 152, 3420, 0, 0, 13],
+  ["Ederson", "Ederson", "Moraes", "MCI", 1, 128, 2970, 0, 0, 11],
+  ["Pope", "Nick", "Pope", "NEW", 1, 134, 3150, 0, 0, 12],
+  ["Sels", "Matz", "Sels", "NFO", 1, 146, 3420, 0, 0, 13],
+  ["Onana", "André", "Onana", "MUN", 1, 118, 3240, 0, 0, 9],
+  ["Vicario", "Guglielmo", "Vicario", "TOT", 1, 122, 3060, 0, 0, 9],
+  ["Leno", "Bernd", "Leno", "FUL", 1, 126, 3420, 0, 0, 10],
+  ["Henderson", "Dean", "Henderson", "CRY", 1, 124, 3330, 0, 0, 10],
+  ["Verbruggen", "Bart", "Verbruggen", "BHA", 1, 112, 3150, 0, 0, 8],
+  // Defenders
+  ["Gabriel", "Gabriel", "Magalhães", "ARS", 2, 148, 3120, 5, 2, 15],
+  ["Saliba", "William", "Saliba", "ARS", 2, 140, 3330, 3, 1, 15],
+  ["Van Dijk", "Virgil", "van Dijk", "LIV", 2, 144, 3420, 4, 2, 13],
+  ["Alexander-Arnold", "Trent", "Alexander-Arnold", "LIV", 2, 156, 2880, 3, 10, 11],
+  ["Robertson", "Andrew", "Robertson", "LIV", 2, 118, 2790, 1, 5, 11],
+  ["Trippier", "Kieran", "Trippier", "NEW", 2, 112, 2520, 1, 7, 9],
+  ["Hall", "Lewis", "Hall", "NEW", 2, 128, 2700, 2, 6, 11],
+  ["Milenković", "Nikola", "Milenković", "NFO", 2, 136, 3330, 5, 1, 13],
+  ["Murillo", "Murillo", "Santos", "NFO", 2, 126, 3240, 2, 2, 13],
+  ["Colwill", "Levi", "Colwill", "CHE", 2, 118, 2970, 2, 1, 11],
+  ["Cucurella", "Marc", "Cucurella", "CHE", 2, 134, 3150, 4, 4, 11],
+  ["James", "Reece", "James", "CHE", 2, 96, 1980, 2, 4, 8],
+  ["Gvardiol", "Joško", "Gvardiol", "MCI", 2, 132, 3060, 5, 2, 10],
+  ["Dias", "Rúben", "Dias", "MCI", 2, 110, 2790, 1, 1, 10],
+  ["Mitchell", "Tyrick", "Mitchell", "CRY", 2, 114, 3150, 1, 4, 10],
+  ["Guéhi", "Marc", "Guéhi", "CRY", 2, 116, 3240, 3, 1, 10],
+  ["Muñoz", "Daniel", "Muñoz", "CRY", 2, 130, 3150, 4, 5, 10],
+  ["Dunk", "Lewis", "Dunk", "BHA", 2, 102, 2880, 2, 1, 8],
+  ["Aina", "Ola", "Aina", "NFO", 2, 122, 3060, 2, 3, 12],
+  ["Konsa", "Ezri", "Konsa", "AVL", 2, 108, 2970, 2, 1, 9],
+  ["Digne", "Lucas", "Digne", "AVL", 2, 106, 2610, 0, 6, 8],
+  ["Kerkez", "Miloš", "Kerkez", "BOU", 2, 124, 3240, 2, 5, 10],
+  ["Zabarnyi", "Illia", "Zabarnyi", "BOU", 2, 112, 3330, 1, 1, 10],
+  ["Romero", "Cristian", "Romero", "TOT", 2, 98, 2520, 3, 1, 7],
+  ["Van de Ven", "Micky", "van de Ven", "TOT", 2, 96, 2340, 2, 1, 8],
+  ["Wan-Bissaka", "Aaron", "Wan-Bissaka", "WHU", 2, 108, 3150, 2, 4, 8],
+  ["Andersen", "Joachim", "Andersen", "FUL", 2, 104, 3060, 1, 1, 9],
+  ["Collins", "Nathan", "Collins", "BRE", 2, 118, 3420, 3, 2, 10],
+  ["Pinnock", "Ethan", "Pinnock", "BRE", 2, 106, 3150, 3, 1, 9],
+  ["Tarkowski", "James", "Tarkowski", "EVE", 2, 120, 3420, 2, 1, 12],
+  ["Branthwaite", "Jarrad", "Branthwaite", "EVE", 2, 114, 3240, 3, 0, 12],
+  ["Mykolenko", "Vitalii", "Mykolenko", "EVE", 2, 104, 2970, 1, 2, 11],
+  // Midfielders
+  ["M.Salah", "Mohamed", "Salah", "LIV", 3, 344, 3420, 29, 18, 0],
+  ["Palmer", "Cole", "Palmer", "CHE", 3, 244, 3240, 15, 9, 0],
+  ["Saka", "Bukayo", "Saka", "ARS", 3, 208, 2700, 12, 13, 0],
+  ["Ødegaard", "Martin", "Ødegaard", "ARS", 3, 176, 2880, 8, 10, 0],
+  ["Son", "Heung-min", "Son", "TOT", 3, 184, 2790, 11, 11, 0],
+  ["B.Fernandes", "Bruno", "Fernandes", "MUN", 3, 212, 3330, 12, 12, 0],
+  ["Foden", "Phil", "Foden", "MCI", 3, 156, 2520, 9, 5, 0],
+  ["Bernardo", "Bernardo", "Silva", "MCI", 3, 148, 2970, 6, 8, 0],
+  ["Marmoush", "Omar", "Marmoush", "MCI", 3, 172, 2340, 12, 6, 0],
+  ["Gordon", "Anthony", "Gordon", "NEW", 3, 168, 2790, 9, 8, 0],
+  ["Barnes", "Harvey", "Barnes", "NEW", 3, 152, 2160, 10, 6, 0],
+  ["Bruno G.", "Bruno", "Guimarães", "NEW", 3, 158, 3330, 5, 7, 0],
+  ["Mbeumo", "Bryan", "Mbeumo", "MUN", 3, 236, 3330, 20, 8, 0],
+  ["Semenyo", "Antoine", "Semenyo", "BOU", 3, 182, 3240, 11, 7, 0],
+  ["Kluivert", "Justin", "Kluivert", "BOU", 3, 178, 2700, 12, 7, 0],
+  ["Rogers", "Morgan", "Rogers", "AVL", 3, 176, 3150, 8, 11, 0],
+  ["McGinn", "John", "McGinn", "AVL", 3, 138, 2880, 5, 7, 0],
+  ["Eze", "Eberechi", "Eze", "ARS", 3, 180, 2970, 10, 8, 0],
+  ["Sarr", "Ismaïla", "Sarr", "CRY", 3, 164, 2790, 9, 6, 0],
+  ["Mitoma", "Kaoru", "Mitoma", "BHA", 3, 156, 2700, 9, 5, 0],
+  ["Rutter", "Georginio", "Rutter", "BHA", 3, 142, 2610, 6, 8, 0],
+  ["Gross", "Pascal", "Groß", "BHA", 3, 134, 2880, 3, 9, 0],
+  ["Schade", "Kevin", "Schade", "BRE", 3, 158, 2790, 11, 4, 0],
+  ["Damsgaard", "Mikkel", "Damsgaard", "BRE", 3, 146, 2970, 4, 10, 0],
+  ["Iwobi", "Alex", "Iwobi", "FUL", 3, 154, 3150, 8, 6, 0],
+  ["Wilson", "Harry", "Wilson", "FUL", 3, 132, 2250, 8, 5, 0],
+  ["Ndiaye", "Iliman", "Ndiaye", "EVE", 3, 152, 2880, 9, 4, 0],
+  ["McNeil", "Dwight", "McNeil", "EVE", 3, 136, 2610, 6, 7, 0],
+  ["Kudus", "Mohammed", "Kudus", "TOT", 3, 148, 2790, 7, 6, 0],
+  ["Bowen", "Jarrod", "Bowen", "WHU", 3, 176, 3150, 12, 7, 0],
+  ["Paquetá", "Lucas", "Paquetá", "WHU", 3, 138, 2790, 6, 6, 0],
+  ["Gibbs-White", "Morgan", "Gibbs-White", "NFO", 3, 154, 2970, 6, 9, 0],
+  ["Hudson-Odoi", "Callum", "Hudson-Odoi", "NFO", 3, 136, 2520, 8, 4, 0],
+  ["Rice", "Declan", "Rice", "ARS", 3, 150, 3060, 6, 8, 0],
+  ["Caicedo", "Moisés", "Caicedo", "CHE", 3, 128, 3240, 3, 3, 0],
+  ["Szoboszlai", "Dominik", "Szoboszlai", "LIV", 3, 146, 2790, 7, 7, 0],
+  ["Gakpo", "Cody", "Gakpo", "LIV", 3, 172, 2520, 13, 5, 0],
+  ["Diaz", "Luis", "Díaz", "LIV", 3, 186, 2880, 13, 7, 0],
+  ["Amad", "Amad", "Diallo", "MUN", 3, 144, 2340, 8, 8, 0],
+  ["Johnson", "Brennan", "Johnson", "TOT", 3, 156, 2610, 11, 4, 0],
+  ["Enzo", "Enzo", "Fernández", "CHE", 3, 152, 3060, 6, 9, 0],
+  ["Neto", "Pedro", "Neto", "CHE", 3, 146, 2790, 7, 7, 0],
+  // Forwards
+  ["Haaland", "Erling", "Haaland", "MCI", 4, 232, 3060, 27, 4, 0],
+  ["Isak", "Alexander", "Isak", "LIV", 4, 228, 2970, 24, 6, 0],
+  ["Watkins", "Ollie", "Watkins", "AVL", 4, 188, 3060, 16, 8, 0],
+  ["Wood", "Chris", "Wood", "NFO", 4, 200, 3150, 20, 3, 0],
+  ["Wissa", "Yoane", "Wissa", "NEW", 4, 190, 2970, 19, 4, 0],
+  ["Cunha", "Matheus", "Cunha", "MUN", 4, 178, 2880, 15, 6, 0],
+  ["João Pedro", "João", "Pedro", "CHE", 4, 164, 2610, 12, 8, 0],
+  ["Jackson", "Nicolas", "Jackson", "CHE", 4, 152, 2340, 12, 5, 0],
+  ["Ekitiké", "Hugo", "Ekitiké", "LIV", 4, 158, 2520, 14, 4, 0],
+  ["Gyökeres", "Viktor", "Gyökeres", "ARS", 4, 150, 2430, 13, 4, 0],
+  ["Šeško", "Benjamin", "Šeško", "MUN", 4, 138, 2250, 11, 3, 0],
+  ["Solanke", "Dominic", "Solanke", "TOT", 4, 142, 2520, 11, 4, 0],
+  ["Mateta", "Jean-Philippe", "Mateta", "CRY", 4, 174, 2790, 17, 2, 0],
+  ["Raúl", "Raúl", "Jiménez", "FUL", 4, 148, 2430, 12, 4, 0],
+  ["Welbeck", "Danny", "Welbeck", "BHA", 4, 144, 2340, 12, 3, 0],
+  ["Thiago", "Igor", "Thiago", "BRE", 4, 136, 2250, 11, 3, 0],
+  ["Beto", "Beto", "Betuncal", "EVE", 4, 132, 2160, 11, 2, 0],
+  ["Strand Larsen", "Jørgen", "Strand Larsen", "WOL", 4, 146, 2700, 14, 2, 0],
+  ["Füllkrug", "Niclas", "Füllkrug", "WHU", 4, 108, 1890, 8, 3, 0],
+  ["Evanilson", "Evanilson", "de Lima", "BOU", 4, 140, 2520, 10, 4, 0],
+];
+
+const elements = players.map(([web_name, first_name, second_name, ts, element_type, total_points, minutes, goals_scored, assists, clean_sheets], i) => {
+  const ppg = minutes > 0 ? (total_points / Math.max(Math.round(minutes / 85), 1)).toFixed(1) : "0.0";
+  return {
+    id: i + 1,
+    code: 200000 + i,
+    first_name,
+    second_name,
+    web_name,
+    element_type,
+    team: T[ts],
+    total_points,
+    points_per_game: ppg,
+    minutes,
+    goals_scored,
+    assists,
+    clean_sheets,
+    saves: element_type === 1 ? Math.round(minutes / 33) : 0,
+    status: "a",
+    news: "",
+    form: "0.0",
+    ict_index: (total_points / 1.6).toFixed(1),
+    draft_rank: null,
+    chance_of_playing_this_round: null,
+  };
+});
+
+const data = {
+  __sample: true,
+  __note: "Demo snapshot with indicative 2025/26 numbers; the deployed app uses live FPL Draft API data.",
+  elements,
+  teams,
+  element_types: [
+    { id: 1, singular_name_short: "GKP", plural_name: "Goalkeepers" },
+    { id: 2, singular_name_short: "DEF", plural_name: "Defenders" },
+    { id: 3, singular_name_short: "MID", plural_name: "Midfielders" },
+    { id: 4, singular_name_short: "FWD", plural_name: "Forwards" },
+  ],
+  events: { current: null, next: 1 },
+};
+
+fs.writeFileSync(path.join(__dirname, "sample-data.json"), JSON.stringify(data, null, 1));
+console.log(`Wrote sample-data.json with ${elements.length} players`);

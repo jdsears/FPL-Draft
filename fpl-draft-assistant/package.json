@@ -1,0 +1,21 @@
+{
+  "name": "fpl-draft-assistant",
+  "version": "1.0.0",
+  "description": "AI-assisted Fantasy Premier League Draft board and strategy assistant",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "build": "npm install --prefix client && npm run build --prefix client",
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  },
+  "devDependencies": {
+    "playwright": "^1.62.1"
+  }
+}
