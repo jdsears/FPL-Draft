@@ -131,7 +131,58 @@ const players = [
   ["Strand Larsen", "Jørgen", "Strand Larsen", "WOL", 4, 146, 2700, 14, 2, 0],
   ["Füllkrug", "Niclas", "Füllkrug", "WHU", 4, 108, 1890, 8, 3, 0],
   ["Evanilson", "Evanilson", "de Lima", "BOU", 4, 140, 2520, 10, 4, 0],
+  // Thin Premier League records: newcomers and youngsters. These exercise the
+  // low-minutes weight shift, where the expert draft rank carries the score.
+  ["Simons", "Xavi", "Simons", "TOT", 3, 0, 0, 0, 0, 0],
+  ["Nwaneri", "Ethan", "Nwaneri", "ARS", 3, 58, 690, 4, 1, 0],
+  ["Bergvall", "Lucas", "Bergvall", "TOT", 3, 62, 780, 2, 3, 0],
+  ["Doak", "Ben", "Doak", "LIV", 3, 24, 310, 1, 1, 0],
+  ["Roefs", "Robin", "Roefs", "SUN", 1, 0, 0, 0, 0, 0],
+  ["Le Fée", "Enzo", "Le Fée", "SUN", 3, 18, 240, 1, 0, 0],
 ];
+
+// Indicative FPL draft order. Where a player is listed the number is the
+// points the pre-season experts would credit them with, which is what the
+// draft order is built from. Everyone else is ordered on last season's points,
+// so the expert signal and the historical signal disagree in places, as they
+// do in the real game.
+const DRAFT_HINTS = {
+  Simons: 196,
+  Nwaneri: 168,
+  Bergvall: 132,
+  Doak: 108,
+  Roefs: 118,
+  "Le Fée": 104,
+  Isak: 246,
+  Gyökeres: 214,
+  Ekitiké: 198,
+  Šeško: 176,
+  "João Pedro": 186,
+  Eze: 194,
+  Kerkez: 148,
+  "Van de Ven": 126,
+  Wissa: 172,
+};
+
+// Fitness flags so demo mode exercises the availability signal.
+const FLAGS = {
+  James: { status: "d", chance_of_playing_this_round: 75, news: "Knock, 75% chance of playing" },
+  Romero: {
+    status: "i",
+    chance_of_playing_this_round: 0,
+    news: "Hamstring injury, expected back mid-September",
+  },
+  Füllkrug: { status: "d", chance_of_playing_this_round: 50, news: "Calf strain, 50% chance of playing" },
+};
+
+// Strength tier per club, 2 (weakest) to 5 (strongest), used to price fixture
+// difficulty in the demo fixtures block.
+const TIERS = {
+  LIV: 5, MCI: 5, ARS: 5,
+  CHE: 4, NEW: 4, TOT: 4, MUN: 4, AVL: 4,
+  NFO: 3, BHA: 3, BOU: 3, CRY: 3, EVE: 3, FUL: 3, BRE: 3,
+  WOL: 2, WHU: 2, LEE: 2, SUN: 2, BUR: 2,
+};
 
 const elements = players.map(([web_name, first_name, second_name, ts, element_type, total_points, minutes, goals_scored, assists, clean_sheets], i) => {
   const ppg = minutes > 0 ? (total_points / Math.max(Math.round(minutes / 85), 1)).toFixed(1) : "0.0";
@@ -156,12 +207,60 @@ const elements = players.map(([web_name, first_name, second_name, ts, element_ty
     ict_index: (total_points / 1.6).toFixed(1),
     draft_rank: null,
     chance_of_playing_this_round: null,
+    ...(FLAGS[web_name] || {}),
   };
 });
+
+// Draft rank: FPL's own pre-season ordering, one sequence across all positions.
+[...elements]
+  .sort((a, b) => (DRAFT_HINTS[b.web_name] ?? b.total_points) - (DRAFT_HINTS[a.web_name] ?? a.total_points))
+  .forEach((el, i) => {
+    el.draft_rank = i + 1;
+  });
+
+// Main-game teams and opening fixtures. The ids deliberately differ from the
+// draft-game team ids, because they do in the real APIs: joins must be made on
+// name or short name.
+const mainTeams = teams.map((t) => ({ id: t.id + 40, name: t.name, short_name: t.short_name }));
+const shortById = Object.fromEntries(mainTeams.map((t) => [t.id, t.short_name]));
+const clamp = (v) => Math.min(5, Math.max(1, v));
+
+// Circle-method round robin: every club plays once per gameweek.
+const wheel = mainTeams.map((t) => t.id);
+const fixtures = [];
+// Home and away are handed to whichever club has had fewer home games so far,
+// so no club ends up with six of one in the opening run.
+const homeCount = Object.fromEntries(wheel.map((id) => [id, 0]));
+let fixtureId = 1;
+for (let gw = 0; gw < 6; gw++) {
+  const rotated = [wheel[0], ...wheel.slice(1).map((_, i) => wheel[1 + ((i + gw) % (wheel.length - 1))])];
+  for (let i = 0; i < wheel.length / 2; i++) {
+    const a = rotated[i];
+    const b = rotated[wheel.length - 1 - i];
+    const homeFirst = homeCount[a] === homeCount[b] ? a < b : homeCount[a] < homeCount[b];
+    const team_h = homeFirst ? a : b;
+    const team_a = homeFirst ? b : a;
+    homeCount[team_h] += 1;
+    fixtures.push({
+      id: fixtureId++,
+      event: gw + 1,
+      team_h,
+      team_a,
+      team_h_difficulty: clamp(TIERS[shortById[team_a]] - 1),
+      team_a_difficulty: clamp(TIERS[shortById[team_h]]),
+      finished: false,
+    });
+  }
+}
 
 const data = {
   __sample: true,
   __note: "Demo snapshot with indicative 2025/26 numbers; the deployed app uses live FPL Draft API data.",
+  __main_game: {
+    __note: "Stand-in for fantasy.premierleague.com teams and fixtures, used for opening-fixture difficulty in demo mode.",
+    teams: mainTeams,
+    fixtures,
+  },
   elements,
   teams,
   element_types: [

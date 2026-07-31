@@ -9,6 +9,9 @@ import { fileURLToPath } from "url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const BASE = "https://draft.premierleague.com/api";
+// The main game publishes fixture difficulty, which the draft game does not.
+const MAIN = "https://fantasy.premierleague.com/api";
+const SIX_HOURS = 6 * 60 * 60 * 1000;
 const HEADERS = {
   "User-Agent":
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36",
@@ -27,15 +30,55 @@ async function getJson(url, ttlMs) {
   return data;
 }
 
+function readSample() {
+  const samplePath = path.join(__dirname, "sample-data.json");
+  return JSON.parse(fs.readFileSync(samplePath, "utf8"));
+}
+
 export async function getBootstrap() {
   try {
     // Player pool changes rarely; cache for 5 minutes.
     const data = await getJson(`${BASE}/bootstrap-static`, 5 * 60 * 1000);
     return { data, source: "live" };
   } catch (err) {
-    const samplePath = path.join(__dirname, "sample-data.json");
-    const data = JSON.parse(fs.readFileSync(samplePath, "utf8"));
-    return { data, source: "sample", error: String(err.message || err) };
+    return { data: readSample(), source: "sample", error: String(err.message || err) };
+  }
+}
+
+/**
+ * Teams and fixtures from the main game, used for opening-fixture difficulty.
+ * Cached for six hours because fixture difficulty barely moves. Never throws:
+ * on failure the caller gets empty arrays and a source of "unavailable" so the
+ * ranking model can fall back to its two historical signals.
+ *
+ * @param {{allowSample?: boolean}} options  allowSample mirrors the demo
+ *   fallback used for the player pool, so demo mode exercises the full model.
+ */
+export async function getMainGameData({ allowSample = false } = {}) {
+  try {
+    const [bootstrap, fixtures] = await Promise.all([
+      getJson(`${MAIN}/bootstrap-static/`, SIX_HOURS),
+      getJson(`${MAIN}/fixtures/`, SIX_HOURS),
+    ]);
+    return {
+      teams: bootstrap.teams || [],
+      fixtures: Array.isArray(fixtures) ? fixtures : [],
+      source: "live",
+    };
+  } catch (err) {
+    const error = String(err.message || err);
+    if (allowSample) {
+      const sample = readSample().__main_game;
+      if (sample) {
+        return {
+          teams: sample.teams || [],
+          fixtures: sample.fixtures || [],
+          source: "sample",
+          error,
+        };
+      }
+    }
+    return { teams: [], fixtures: [], source: "unavailable", error };
   }
 }
 

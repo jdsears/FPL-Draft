@@ -1,6 +1,653 @@
 {
  "__sample": true,
  "__note": "Demo snapshot with indicative 2025/26 numbers; the deployed app uses live FPL Draft API data.",
+ "__main_game": {
+  "__note": "Stand-in for fantasy.premierleague.com teams and fixtures, used for opening-fixture difficulty in demo mode.",
+  "teams": [
+   {
+    "id": 41,
+    "name": "Arsenal",
+    "short_name": "ARS"
+   },
+   {
+    "id": 42,
+    "name": "Aston Villa",
+    "short_name": "AVL"
+   },
+   {
+    "id": 43,
+    "name": "Bournemouth",
+    "short_name": "BOU"
+   },
+   {
+    "id": 44,
+    "name": "Brentford",
+    "short_name": "BRE"
+   },
+   {
+    "id": 45,
+    "name": "Brighton",
+    "short_name": "BHA"
+   },
+   {
+    "id": 46,
+    "name": "Chelsea",
+    "short_name": "CHE"
+   },
+   {
+    "id": 47,
+    "name": "Crystal Palace",
+    "short_name": "CRY"
+   },
+   {
+    "id": 48,
+    "name": "Everton",
+    "short_name": "EVE"
+   },
+   {
+    "id": 49,
+    "name": "Fulham",
+    "short_name": "FUL"
+   },
+   {
+    "id": 50,
+    "name": "Leeds",
+    "short_name": "LEE"
+   },
+   {
+    "id": 51,
+    "name": "Liverpool",
+    "short_name": "LIV"
+   },
+   {
+    "id": 52,
+    "name": "Man City",
+    "short_name": "MCI"
+   },
+   {
+    "id": 53,
+    "name": "Man Utd",
+    "short_name": "MUN"
+   },
+   {
+    "id": 54,
+    "name": "Newcastle",
+    "short_name": "NEW"
+   },
+   {
+    "id": 55,
+    "name": "Nott'm Forest",
+    "short_name": "NFO"
+   },
+   {
+    "id": 56,
+    "name": "Sunderland",
+    "short_name": "SUN"
+   },
+   {
+    "id": 57,
+    "name": "Spurs",
+    "short_name": "TOT"
+   },
+   {
+    "id": 58,
+    "name": "West Ham",
+    "short_name": "WHU"
+   },
+   {
+    "id": 59,
+    "name": "Wolves",
+    "short_name": "WOL"
+   },
+   {
+    "id": 60,
+    "name": "Burnley",
+    "short_name": "BUR"
+   }
+  ],
+  "fixtures": [
+   {
+    "id": 1,
+    "event": 1,
+    "team_h": 41,
+    "team_a": 60,
+    "team_h_difficulty": 1,
+    "team_a_difficulty": 5,
+    "finished": false
+   },
+   {
+    "id": 2,
+    "event": 1,
+    "team_h": 42,
+    "team_a": 59,
+    "team_h_difficulty": 1,
+    "team_a_difficulty": 4,
+    "finished": false
+   },
+   {
+    "id": 3,
+    "event": 1,
+    "team_h": 43,
+    "team_a": 58,
+    "team_h_difficulty": 1,
+    "team_a_difficulty": 3,
+    "finished": false
+   },
+   {
+    "id": 4,
+    "event": 1,
+    "team_h": 44,
+    "team_a": 57,
+    "team_h_difficulty": 3,
+    "team_a_difficulty": 3,
+    "finished": false
+   },
+   {
+    "id": 5,
+    "event": 1,
+    "team_h": 45,
+    "team_a": 56,
+    "team_h_difficulty": 1,
+    "team_a_difficulty": 3,
+    "finished": false
+   },
+   {
+    "id": 6,
+    "event": 1,
+    "team_h": 46,
+    "team_a": 55,
+    "team_h_difficulty": 2,
+    "team_a_difficulty": 4,
+    "finished": false
+   },
+   {
+    "id": 7,
+    "event": 1,
+    "team_h": 47,
+    "team_a": 54,
+    "team_h_difficulty": 3,
+    "team_a_difficulty": 3,
+    "finished": false
+   },
+   {
+    "id": 8,
+    "event": 1,
+    "team_h": 48,
+    "team_a": 53,
+    "team_h_difficulty": 3,
+    "team_a_difficulty": 3,
+    "finished": false
+   },
+   {
+    "id": 9,
+    "event": 1,
+    "team_h": 49,
+    "team_a": 52,
+    "team_h_difficulty": 4,
+    "team_a_difficulty": 3,
+    "finished": false
+   },
+   {
+    "id": 10,
+    "event": 1,
+    "team_h": 50,
+    "team_a": 51,
+    "team_h_difficulty": 4,
+    "team_a_difficulty": 2,
+    "finished": false
+   },
+   {
+    "id": 11,
+    "event": 2,
+    "team_h": 41,
+    "team_a": 42,
+    "team_h_difficulty": 3,
+    "team_a_difficulty": 5,
+    "finished": false
+   },
+   {
+    "id": 12,
+    "event": 2,
+    "team_h": 60,
+    "team_a": 43,
+    "team_h_difficulty": 2,
+    "team_a_difficulty": 2,
+    "finished": false
+   },
+   {
+    "id": 13,
+    "event": 2,
+    "team_h": 59,
+    "team_a": 44,
+    "team_h_difficulty": 2,
+    "team_a_difficulty": 2,
+    "finished": false
+   },
+   {
+    "id": 14,
+    "event": 2,
+    "team_h": 58,
+    "team_a": 45,
+    "team_h_difficulty": 2,
+    "team_a_difficulty": 2,
+    "finished": false
+   },
+   {
+    "id": 15,
+    "event": 2,
+    "team_h": 57,
+    "team_a": 46,
+    "team_h_difficulty": 3,
+    "team_a_difficulty": 4,
+    "finished": false
+   },
+   {
+    "id": 16,
+    "event": 2,
+    "team_h": 56,
+    "team_a": 47,
+    "team_h_difficulty": 2,
+    "team_a_difficulty": 2,
+    "finished": false
+   },
+   {
+    "id": 17,
+    "event": 2,
+    "team_h": 55,
+    "team_a": 48,
+    "team_h_difficulty": 2,
+    "team_a_difficulty": 3,
+    "finished": false
+   },
+   {
+    "id": 18,
+    "event": 2,
+    "team_h": 54,
+    "team_a": 49,
+    "team_h_difficulty": 2,
+    "team_a_difficulty": 4,
+    "finished": false
+   },
+   {
+    "id": 19,
+    "event": 2,
+    "team_h": 53,
+    "team_a": 50,
+    "team_h_difficulty": 1,
+    "team_a_difficulty": 4,
+    "finished": false
+   },
+   {
+    "id": 20,
+    "event": 2,
+    "team_h": 51,
+    "team_a": 52,
+    "team_h_difficulty": 4,
+    "team_a_difficulty": 5,
+    "finished": false
+   },
+   {
+    "id": 21,
+    "event": 3,
+    "team_h": 43,
+    "team_a": 41,
+    "team_h_difficulty": 4,
+    "team_a_difficulty": 3,
+    "finished": false
+   },
+   {
+    "id": 22,
+    "event": 3,
+    "team_h": 42,
+    "team_a": 44,
+    "team_h_difficulty": 2,
+    "team_a_difficulty": 4,
+    "finished": false
+   },
+   {
+    "id": 23,
+    "event": 3,
+    "team_h": 45,
+    "team_a": 60,
+    "team_h_difficulty": 1,
+    "team_a_difficulty": 3,
+    "finished": false
+   },
+   {
+    "id": 24,
+    "event": 3,
+    "team_h": 46,
+    "team_a": 59,
+    "team_h_difficulty": 1,
+    "team_a_difficulty": 4,
+    "finished": false
+   },
+   {
+    "id": 25,
+    "event": 3,
+    "team_h": 47,
+    "team_a": 58,
+    "team_h_difficulty": 1,
+    "team_a_difficulty": 3,
+    "finished": false
+   },
+   {
+    "id": 26,
+    "event": 3,
+    "team_h": 48,
+    "team_a": 57,
+    "team_h_difficulty": 3,
+    "team_a_difficulty": 3,
+    "finished": false
+   },
+   {
+    "id": 27,
+    "event": 3,
+    "team_h": 49,
+    "team_a": 56,
+    "team_h_difficulty": 1,
+    "team_a_difficulty": 3,
+    "finished": false
+   },
+   {
+    "id": 28,
+    "event": 3,
+    "team_h": 50,
+    "team_a": 55,
+    "team_h_difficulty": 2,
+    "team_a_difficulty": 2,
+    "finished": false
+   },
+   {
+    "id": 29,
+    "event": 3,
+    "team_h": 51,
+    "team_a": 54,
+    "team_h_difficulty": 3,
+    "team_a_difficulty": 5,
+    "finished": false
+   },
+   {
+    "id": 30,
+    "event": 3,
+    "team_h": 52,
+    "team_a": 53,
+    "team_h_difficulty": 3,
+    "team_a_difficulty": 5,
+    "finished": false
+   },
+   {
+    "id": 31,
+    "event": 4,
+    "team_h": 44,
+    "team_a": 41,
+    "team_h_difficulty": 4,
+    "team_a_difficulty": 3,
+    "finished": false
+   },
+   {
+    "id": 32,
+    "event": 4,
+    "team_h": 43,
+    "team_a": 45,
+    "team_h_difficulty": 2,
+    "team_a_difficulty": 3,
+    "finished": false
+   },
+   {
+    "id": 33,
+    "event": 4,
+    "team_h": 42,
+    "team_a": 46,
+    "team_h_difficulty": 3,
+    "team_a_difficulty": 4,
+    "finished": false
+   },
+   {
+    "id": 34,
+    "event": 4,
+    "team_h": 60,
+    "team_a": 47,
+    "team_h_difficulty": 2,
+    "team_a_difficulty": 2,
+    "finished": false
+   },
+   {
+    "id": 35,
+    "event": 4,
+    "team_h": 59,
+    "team_a": 48,
+    "team_h_difficulty": 2,
+    "team_a_difficulty": 2,
+    "finished": false
+   },
+   {
+    "id": 36,
+    "event": 4,
+    "team_h": 58,
+    "team_a": 49,
+    "team_h_difficulty": 2,
+    "team_a_difficulty": 2,
+    "finished": false
+   },
+   {
+    "id": 37,
+    "event": 4,
+    "team_h": 57,
+    "team_a": 50,
+    "team_h_difficulty": 1,
+    "team_a_difficulty": 4,
+    "finished": false
+   },
+   {
+    "id": 38,
+    "event": 4,
+    "team_h": 56,
+    "team_a": 51,
+    "team_h_difficulty": 4,
+    "team_a_difficulty": 2,
+    "finished": false
+   },
+   {
+    "id": 39,
+    "event": 4,
+    "team_h": 52,
+    "team_a": 55,
+    "team_h_difficulty": 2,
+    "team_a_difficulty": 5,
+    "finished": false
+   },
+   {
+    "id": 40,
+    "event": 4,
+    "team_h": 53,
+    "team_a": 54,
+    "team_h_difficulty": 3,
+    "team_a_difficulty": 4,
+    "finished": false
+   },
+   {
+    "id": 41,
+    "event": 5,
+    "team_h": 41,
+    "team_a": 45,
+    "team_h_difficulty": 2,
+    "team_a_difficulty": 5,
+    "finished": false
+   },
+   {
+    "id": 42,
+    "event": 5,
+    "team_h": 44,
+    "team_a": 46,
+    "team_h_difficulty": 3,
+    "team_a_difficulty": 3,
+    "finished": false
+   },
+   {
+    "id": 43,
+    "event": 5,
+    "team_h": 47,
+    "team_a": 43,
+    "team_h_difficulty": 2,
+    "team_a_difficulty": 3,
+    "finished": false
+   },
+   {
+    "id": 44,
+    "event": 5,
+    "team_h": 48,
+    "team_a": 42,
+    "team_h_difficulty": 3,
+    "team_a_difficulty": 3,
+    "finished": false
+   },
+   {
+    "id": 45,
+    "event": 5,
+    "team_h": 49,
+    "team_a": 60,
+    "team_h_difficulty": 1,
+    "team_a_difficulty": 3,
+    "finished": false
+   },
+   {
+    "id": 46,
+    "event": 5,
+    "team_h": 50,
+    "team_a": 59,
+    "team_h_difficulty": 1,
+    "team_a_difficulty": 2,
+    "finished": false
+   },
+   {
+    "id": 47,
+    "event": 5,
+    "team_h": 51,
+    "team_a": 58,
+    "team_h_difficulty": 1,
+    "team_a_difficulty": 5,
+    "finished": false
+   },
+   {
+    "id": 48,
+    "event": 5,
+    "team_h": 52,
+    "team_a": 57,
+    "team_h_difficulty": 3,
+    "team_a_difficulty": 5,
+    "finished": false
+   },
+   {
+    "id": 49,
+    "event": 5,
+    "team_h": 53,
+    "team_a": 56,
+    "team_h_difficulty": 1,
+    "team_a_difficulty": 4,
+    "finished": false
+   },
+   {
+    "id": 50,
+    "event": 5,
+    "team_h": 54,
+    "team_a": 55,
+    "team_h_difficulty": 2,
+    "team_a_difficulty": 4,
+    "finished": false
+   },
+   {
+    "id": 51,
+    "event": 6,
+    "team_h": 46,
+    "team_a": 41,
+    "team_h_difficulty": 4,
+    "team_a_difficulty": 4,
+    "finished": false
+   },
+   {
+    "id": 52,
+    "event": 6,
+    "team_h": 45,
+    "team_a": 47,
+    "team_h_difficulty": 2,
+    "team_a_difficulty": 3,
+    "finished": false
+   },
+   {
+    "id": 53,
+    "event": 6,
+    "team_h": 44,
+    "team_a": 48,
+    "team_h_difficulty": 2,
+    "team_a_difficulty": 3,
+    "finished": false
+   },
+   {
+    "id": 54,
+    "event": 6,
+    "team_h": 43,
+    "team_a": 49,
+    "team_h_difficulty": 2,
+    "team_a_difficulty": 3,
+    "finished": false
+   },
+   {
+    "id": 55,
+    "event": 6,
+    "team_h": 42,
+    "team_a": 50,
+    "team_h_difficulty": 1,
+    "team_a_difficulty": 4,
+    "finished": false
+   },
+   {
+    "id": 56,
+    "event": 6,
+    "team_h": 60,
+    "team_a": 51,
+    "team_h_difficulty": 4,
+    "team_a_difficulty": 2,
+    "finished": false
+   },
+   {
+    "id": 57,
+    "event": 6,
+    "team_h": 59,
+    "team_a": 52,
+    "team_h_difficulty": 4,
+    "team_a_difficulty": 2,
+    "finished": false
+   },
+   {
+    "id": 58,
+    "event": 6,
+    "team_h": 58,
+    "team_a": 53,
+    "team_h_difficulty": 3,
+    "team_a_difficulty": 2,
+    "finished": false
+   },
+   {
+    "id": 59,
+    "event": 6,
+    "team_h": 54,
+    "team_a": 57,
+    "team_h_difficulty": 3,
+    "team_a_difficulty": 4,
+    "finished": false
+   },
+   {
+    "id": 60,
+    "event": 6,
+    "team_h": 55,
+    "team_a": 56,
+    "team_h_difficulty": 1,
+    "team_a_difficulty": 3,
+    "finished": false
+   }
+  ]
+ },
  "elements": [
   {
    "id": 1,
@@ -21,7 +668,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "98.8",
-   "draft_rank": null,
+   "draft_rank": 31,
    "chance_of_playing_this_round": null
   },
   {
@@ -43,7 +690,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "88.8",
-   "draft_rank": null,
+   "draft_rank": 59,
    "chance_of_playing_this_round": null
   },
   {
@@ -65,7 +712,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "86.3",
-   "draft_rank": null,
+   "draft_rank": 64,
    "chance_of_playing_this_round": null
   },
   {
@@ -87,7 +734,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "95.0",
-   "draft_rank": null,
+   "draft_rank": 40,
    "chance_of_playing_this_round": null
   },
   {
@@ -109,7 +756,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "80.0",
-   "draft_rank": null,
+   "draft_rank": 79,
    "chance_of_playing_this_round": null
   },
   {
@@ -131,7 +778,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "83.8",
-   "draft_rank": null,
+   "draft_rank": 71,
    "chance_of_playing_this_round": null
   },
   {
@@ -153,7 +800,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "91.3",
-   "draft_rank": null,
+   "draft_rank": 51,
    "chance_of_playing_this_round": null
   },
   {
@@ -175,7 +822,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "73.8",
-   "draft_rank": null,
+   "draft_rank": 89,
    "chance_of_playing_this_round": null
   },
   {
@@ -197,7 +844,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "76.3",
-   "draft_rank": null,
+   "draft_rank": 86,
    "chance_of_playing_this_round": null
   },
   {
@@ -219,7 +866,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "78.8",
-   "draft_rank": null,
+   "draft_rank": 82,
    "chance_of_playing_this_round": null
   },
   {
@@ -241,7 +888,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "77.5",
-   "draft_rank": null,
+   "draft_rank": 85,
    "chance_of_playing_this_round": null
   },
   {
@@ -263,7 +910,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "70.0",
-   "draft_rank": null,
+   "draft_rank": 97,
    "chance_of_playing_this_round": null
   },
   {
@@ -285,7 +932,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "92.5",
-   "draft_rank": null,
+   "draft_rank": 46,
    "chance_of_playing_this_round": null
   },
   {
@@ -307,7 +954,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "87.5",
-   "draft_rank": null,
+   "draft_rank": 62,
    "chance_of_playing_this_round": null
   },
   {
@@ -329,7 +976,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "90.0",
-   "draft_rank": null,
+   "draft_rank": 56,
    "chance_of_playing_this_round": null
   },
   {
@@ -351,7 +998,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "97.5",
-   "draft_rank": null,
+   "draft_rank": 34,
    "chance_of_playing_this_round": null
   },
   {
@@ -373,7 +1020,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "73.8",
-   "draft_rank": null,
+   "draft_rank": 90,
    "chance_of_playing_this_round": null
   },
   {
@@ -395,7 +1042,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "70.0",
-   "draft_rank": null,
+   "draft_rank": 98,
    "chance_of_playing_this_round": null
   },
   {
@@ -417,7 +1064,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "80.0",
-   "draft_rank": null,
+   "draft_rank": 80,
    "chance_of_playing_this_round": null
   },
   {
@@ -439,7 +1086,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "85.0",
-   "draft_rank": null,
+   "draft_rank": 67,
    "chance_of_playing_this_round": null
   },
   {
@@ -461,7 +1108,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "78.8",
-   "draft_rank": null,
+   "draft_rank": 83,
    "chance_of_playing_this_round": null
   },
   {
@@ -483,7 +1130,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "73.8",
-   "draft_rank": null,
+   "draft_rank": 91,
    "chance_of_playing_this_round": null
   },
   {
@@ -505,7 +1152,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "83.8",
-   "draft_rank": null,
+   "draft_rank": 72,
    "chance_of_playing_this_round": null
   },
   {
@@ -523,12 +1170,12 @@
    "assists": 4,
    "clean_sheets": 8,
    "saves": 0,
-   "status": "a",
-   "news": "",
+   "status": "d",
+   "news": "Knock, 75% chance of playing",
    "form": "0.0",
    "ict_index": "60.0",
-   "draft_rank": null,
-   "chance_of_playing_this_round": null
+   "draft_rank": 112,
+   "chance_of_playing_this_round": 75
   },
   {
    "id": 25,
@@ -549,7 +1196,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "82.5",
-   "draft_rank": null,
+   "draft_rank": 74,
    "chance_of_playing_this_round": null
   },
   {
@@ -571,7 +1218,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "68.8",
-   "draft_rank": null,
+   "draft_rank": 100,
    "chance_of_playing_this_round": null
   },
   {
@@ -593,7 +1240,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "71.3",
-   "draft_rank": null,
+   "draft_rank": 95,
    "chance_of_playing_this_round": null
   },
   {
@@ -615,7 +1262,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "72.5",
-   "draft_rank": null,
+   "draft_rank": 94,
    "chance_of_playing_this_round": null
   },
   {
@@ -637,7 +1284,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "81.3",
-   "draft_rank": null,
+   "draft_rank": 78,
    "chance_of_playing_this_round": null
   },
   {
@@ -659,7 +1306,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "63.8",
-   "draft_rank": null,
+   "draft_rank": 110,
    "chance_of_playing_this_round": null
   },
   {
@@ -681,7 +1328,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "76.3",
-   "draft_rank": null,
+   "draft_rank": 87,
    "chance_of_playing_this_round": null
   },
   {
@@ -703,7 +1350,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "67.5",
-   "draft_rank": null,
+   "draft_rank": 101,
    "chance_of_playing_this_round": null
   },
   {
@@ -725,7 +1372,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "66.3",
-   "draft_rank": null,
+   "draft_rank": 105,
    "chance_of_playing_this_round": null
   },
   {
@@ -747,7 +1394,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "77.5",
-   "draft_rank": null,
+   "draft_rank": 47,
    "chance_of_playing_this_round": null
   },
   {
@@ -769,7 +1416,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "70.0",
-   "draft_rank": null,
+   "draft_rank": 99,
    "chance_of_playing_this_round": null
   },
   {
@@ -787,12 +1434,12 @@
    "assists": 1,
    "clean_sheets": 7,
    "saves": 0,
-   "status": "a",
-   "news": "",
+   "status": "i",
+   "news": "Hamstring injury, expected back mid-September",
    "form": "0.0",
    "ict_index": "61.3",
-   "draft_rank": null,
-   "chance_of_playing_this_round": null
+   "draft_rank": 111,
+   "chance_of_playing_this_round": 0
   },
   {
    "id": 37,
@@ -813,7 +1460,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "60.0",
-   "draft_rank": null,
+   "draft_rank": 84,
    "chance_of_playing_this_round": null
   },
   {
@@ -835,7 +1482,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "67.5",
-   "draft_rank": null,
+   "draft_rank": 102,
    "chance_of_playing_this_round": null
   },
   {
@@ -857,7 +1504,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "65.0",
-   "draft_rank": null,
+   "draft_rank": 107,
    "chance_of_playing_this_round": null
   },
   {
@@ -879,7 +1526,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "73.8",
-   "draft_rank": null,
+   "draft_rank": 92,
    "chance_of_playing_this_round": null
   },
   {
@@ -901,7 +1548,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "66.3",
-   "draft_rank": null,
+   "draft_rank": 106,
    "chance_of_playing_this_round": null
   },
   {
@@ -923,7 +1570,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "75.0",
-   "draft_rank": null,
+   "draft_rank": 88,
    "chance_of_playing_this_round": null
   },
   {
@@ -945,7 +1592,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "71.3",
-   "draft_rank": null,
+   "draft_rank": 96,
    "chance_of_playing_this_round": null
   },
   {
@@ -967,7 +1614,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "65.0",
-   "draft_rank": null,
+   "draft_rank": 108,
    "chance_of_playing_this_round": null
   },
   {
@@ -989,7 +1636,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "215.0",
-   "draft_rank": null,
+   "draft_rank": 1,
    "chance_of_playing_this_round": null
   },
   {
@@ -1011,7 +1658,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "152.5",
-   "draft_rank": null,
+   "draft_rank": 3,
    "chance_of_playing_this_round": null
   },
   {
@@ -1033,7 +1680,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "130.0",
-   "draft_rank": null,
+   "draft_rank": 8,
    "chance_of_playing_this_round": null
   },
   {
@@ -1055,7 +1702,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "110.0",
-   "draft_rank": null,
+   "draft_rank": 20,
    "chance_of_playing_this_round": null
   },
   {
@@ -1077,7 +1724,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "115.0",
-   "draft_rank": null,
+   "draft_rank": 16,
    "chance_of_playing_this_round": null
   },
   {
@@ -1099,7 +1746,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "132.5",
-   "draft_rank": null,
+   "draft_rank": 7,
    "chance_of_playing_this_round": null
   },
   {
@@ -1121,7 +1768,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "97.5",
-   "draft_rank": null,
+   "draft_rank": 35,
    "chance_of_playing_this_round": null
   },
   {
@@ -1143,7 +1790,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "92.5",
-   "draft_rank": null,
+   "draft_rank": 48,
    "chance_of_playing_this_round": null
   },
   {
@@ -1165,7 +1812,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "107.5",
-   "draft_rank": null,
+   "draft_rank": 25,
    "chance_of_playing_this_round": null
   },
   {
@@ -1187,7 +1834,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "105.0",
-   "draft_rank": null,
+   "draft_rank": 28,
    "chance_of_playing_this_round": null
   },
   {
@@ -1209,7 +1856,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "95.0",
-   "draft_rank": null,
+   "draft_rank": 41,
    "chance_of_playing_this_round": null
   },
   {
@@ -1231,7 +1878,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "98.8",
-   "draft_rank": null,
+   "draft_rank": 32,
    "chance_of_playing_this_round": null
   },
   {
@@ -1253,7 +1900,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "147.5",
-   "draft_rank": null,
+   "draft_rank": 4,
    "chance_of_playing_this_round": null
   },
   {
@@ -1275,7 +1922,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "113.8",
-   "draft_rank": null,
+   "draft_rank": 17,
    "chance_of_playing_this_round": null
   },
   {
@@ -1297,7 +1944,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "111.3",
-   "draft_rank": null,
+   "draft_rank": 18,
    "chance_of_playing_this_round": null
   },
   {
@@ -1319,7 +1966,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "110.0",
-   "draft_rank": null,
+   "draft_rank": 21,
    "chance_of_playing_this_round": null
   },
   {
@@ -1341,7 +1988,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "86.3",
-   "draft_rank": null,
+   "draft_rank": 65,
    "chance_of_playing_this_round": null
   },
   {
@@ -1363,7 +2010,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "112.5",
-   "draft_rank": null,
+   "draft_rank": 12,
    "chance_of_playing_this_round": null
   },
   {
@@ -1385,7 +2032,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "102.5",
-   "draft_rank": null,
+   "draft_rank": 30,
    "chance_of_playing_this_round": null
   },
   {
@@ -1407,7 +2054,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "97.5",
-   "draft_rank": null,
+   "draft_rank": 36,
    "chance_of_playing_this_round": null
   },
   {
@@ -1429,7 +2076,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "88.8",
-   "draft_rank": null,
+   "draft_rank": 60,
    "chance_of_playing_this_round": null
   },
   {
@@ -1451,7 +2098,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "83.8",
-   "draft_rank": null,
+   "draft_rank": 73,
    "chance_of_playing_this_round": null
   },
   {
@@ -1473,7 +2120,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "98.8",
-   "draft_rank": null,
+   "draft_rank": 33,
    "chance_of_playing_this_round": null
   },
   {
@@ -1495,7 +2142,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "91.3",
-   "draft_rank": null,
+   "draft_rank": 52,
    "chance_of_playing_this_round": null
   },
   {
@@ -1517,7 +2164,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "96.3",
-   "draft_rank": null,
+   "draft_rank": 38,
    "chance_of_playing_this_round": null
   },
   {
@@ -1539,7 +2186,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "82.5",
-   "draft_rank": null,
+   "draft_rank": 75,
    "chance_of_playing_this_round": null
   },
   {
@@ -1561,7 +2208,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "95.0",
-   "draft_rank": null,
+   "draft_rank": 42,
    "chance_of_playing_this_round": null
   },
   {
@@ -1583,7 +2230,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "85.0",
-   "draft_rank": null,
+   "draft_rank": 68,
    "chance_of_playing_this_round": null
   },
   {
@@ -1605,7 +2252,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "92.5",
-   "draft_rank": null,
+   "draft_rank": 49,
    "chance_of_playing_this_round": null
   },
   {
@@ -1627,7 +2274,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "110.0",
-   "draft_rank": null,
+   "draft_rank": 22,
    "chance_of_playing_this_round": null
   },
   {
@@ -1649,7 +2296,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "86.3",
-   "draft_rank": null,
+   "draft_rank": 66,
    "chance_of_playing_this_round": null
   },
   {
@@ -1671,7 +2318,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "96.3",
-   "draft_rank": null,
+   "draft_rank": 39,
    "chance_of_playing_this_round": null
   },
   {
@@ -1693,7 +2340,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "85.0",
-   "draft_rank": null,
+   "draft_rank": 69,
    "chance_of_playing_this_round": null
   },
   {
@@ -1715,7 +2362,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "93.8",
-   "draft_rank": null,
+   "draft_rank": 45,
    "chance_of_playing_this_round": null
   },
   {
@@ -1737,7 +2384,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "80.0",
-   "draft_rank": null,
+   "draft_rank": 81,
    "chance_of_playing_this_round": null
   },
   {
@@ -1759,7 +2406,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "91.3",
-   "draft_rank": null,
+   "draft_rank": 53,
    "chance_of_playing_this_round": null
   },
   {
@@ -1781,7 +2428,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "107.5",
-   "draft_rank": null,
+   "draft_rank": 26,
    "chance_of_playing_this_round": null
   },
   {
@@ -1803,7 +2450,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "116.3",
-   "draft_rank": null,
+   "draft_rank": 14,
    "chance_of_playing_this_round": null
   },
   {
@@ -1825,7 +2472,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "90.0",
-   "draft_rank": null,
+   "draft_rank": 57,
    "chance_of_playing_this_round": null
   },
   {
@@ -1847,7 +2494,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "97.5",
-   "draft_rank": null,
+   "draft_rank": 37,
    "chance_of_playing_this_round": null
   },
   {
@@ -1869,7 +2516,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "95.0",
-   "draft_rank": null,
+   "draft_rank": 43,
    "chance_of_playing_this_round": null
   },
   {
@@ -1891,7 +2538,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "91.3",
-   "draft_rank": null,
+   "draft_rank": 54,
    "chance_of_playing_this_round": null
   },
   {
@@ -1913,7 +2560,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "145.0",
-   "draft_rank": null,
+   "draft_rank": 5,
    "chance_of_playing_this_round": null
   },
   {
@@ -1935,7 +2582,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "142.5",
-   "draft_rank": null,
+   "draft_rank": 2,
    "chance_of_playing_this_round": null
   },
   {
@@ -1957,7 +2604,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "117.5",
-   "draft_rank": null,
+   "draft_rank": 13,
    "chance_of_playing_this_round": null
   },
   {
@@ -1979,7 +2626,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "125.0",
-   "draft_rank": null,
+   "draft_rank": 9,
    "chance_of_playing_this_round": null
   },
   {
@@ -2001,7 +2648,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "118.8",
-   "draft_rank": null,
+   "draft_rank": 27,
    "chance_of_playing_this_round": null
   },
   {
@@ -2023,7 +2670,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "111.3",
-   "draft_rank": null,
+   "draft_rank": 19,
    "chance_of_playing_this_round": null
   },
   {
@@ -2045,7 +2692,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "102.5",
-   "draft_rank": null,
+   "draft_rank": 15,
    "chance_of_playing_this_round": null
   },
   {
@@ -2067,7 +2714,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "95.0",
-   "draft_rank": null,
+   "draft_rank": 44,
    "chance_of_playing_this_round": null
   },
   {
@@ -2089,7 +2736,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "98.8",
-   "draft_rank": null,
+   "draft_rank": 10,
    "chance_of_playing_this_round": null
   },
   {
@@ -2111,7 +2758,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "93.8",
-   "draft_rank": null,
+   "draft_rank": 6,
    "chance_of_playing_this_round": null
   },
   {
@@ -2133,7 +2780,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "86.3",
-   "draft_rank": null,
+   "draft_rank": 23,
    "chance_of_playing_this_round": null
   },
   {
@@ -2155,7 +2802,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "88.8",
-   "draft_rank": null,
+   "draft_rank": 61,
    "chance_of_playing_this_round": null
   },
   {
@@ -2177,7 +2824,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "108.8",
-   "draft_rank": null,
+   "draft_rank": 24,
    "chance_of_playing_this_round": null
   },
   {
@@ -2199,7 +2846,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "92.5",
-   "draft_rank": null,
+   "draft_rank": 50,
    "chance_of_playing_this_round": null
   },
   {
@@ -2221,7 +2868,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "90.0",
-   "draft_rank": null,
+   "draft_rank": 58,
    "chance_of_playing_this_round": null
   },
   {
@@ -2243,7 +2890,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "85.0",
-   "draft_rank": null,
+   "draft_rank": 70,
    "chance_of_playing_this_round": null
   },
   {
@@ -2265,7 +2912,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "82.5",
-   "draft_rank": null,
+   "draft_rank": 76,
    "chance_of_playing_this_round": null
   },
   {
@@ -2287,7 +2934,7 @@
    "news": "",
    "form": "0.0",
    "ict_index": "91.3",
-   "draft_rank": null,
+   "draft_rank": 55,
    "chance_of_playing_this_round": null
   },
   {
@@ -2305,12 +2952,12 @@
    "assists": 3,
    "clean_sheets": 0,
    "saves": 0,
-   "status": "a",
-   "news": "",
+   "status": "d",
+   "news": "Calf strain, 50% chance of playing",
    "form": "0.0",
    "ict_index": "67.5",
-   "draft_rank": null,
-   "chance_of_playing_this_round": null
+   "draft_rank": 103,
+   "chance_of_playing_this_round": 50
   },
   {
    "id": 106,
@@ -2331,7 +2978,139 @@
    "news": "",
    "form": "0.0",
    "ict_index": "87.5",
-   "draft_rank": null,
+   "draft_rank": 63,
+   "chance_of_playing_this_round": null
+  },
+  {
+   "id": 107,
+   "code": 200106,
+   "first_name": "Xavi",
+   "second_name": "Simons",
+   "web_name": "Simons",
+   "element_type": 3,
+   "team": 17,
+   "total_points": 0,
+   "points_per_game": "0.0",
+   "minutes": 0,
+   "goals_scored": 0,
+   "assists": 0,
+   "clean_sheets": 0,
+   "saves": 0,
+   "status": "a",
+   "news": "",
+   "form": "0.0",
+   "ict_index": "0.0",
+   "draft_rank": 11,
+   "chance_of_playing_this_round": null
+  },
+  {
+   "id": 108,
+   "code": 200107,
+   "first_name": "Ethan",
+   "second_name": "Nwaneri",
+   "web_name": "Nwaneri",
+   "element_type": 3,
+   "team": 1,
+   "total_points": 58,
+   "points_per_game": "7.3",
+   "minutes": 690,
+   "goals_scored": 4,
+   "assists": 1,
+   "clean_sheets": 0,
+   "saves": 0,
+   "status": "a",
+   "news": "",
+   "form": "0.0",
+   "ict_index": "36.3",
+   "draft_rank": 29,
+   "chance_of_playing_this_round": null
+  },
+  {
+   "id": 109,
+   "code": 200108,
+   "first_name": "Lucas",
+   "second_name": "Bergvall",
+   "web_name": "Bergvall",
+   "element_type": 3,
+   "team": 17,
+   "total_points": 62,
+   "points_per_game": "6.9",
+   "minutes": 780,
+   "goals_scored": 2,
+   "assists": 3,
+   "clean_sheets": 0,
+   "saves": 0,
+   "status": "a",
+   "news": "",
+   "form": "0.0",
+   "ict_index": "38.8",
+   "draft_rank": 77,
+   "chance_of_playing_this_round": null
+  },
+  {
+   "id": 110,
+   "code": 200109,
+   "first_name": "Ben",
+   "second_name": "Doak",
+   "web_name": "Doak",
+   "element_type": 3,
+   "team": 11,
+   "total_points": 24,
+   "points_per_game": "6.0",
+   "minutes": 310,
+   "goals_scored": 1,
+   "assists": 1,
+   "clean_sheets": 0,
+   "saves": 0,
+   "status": "a",
+   "news": "",
+   "form": "0.0",
+   "ict_index": "15.0",
+   "draft_rank": 104,
+   "chance_of_playing_this_round": null
+  },
+  {
+   "id": 111,
+   "code": 200110,
+   "first_name": "Robin",
+   "second_name": "Roefs",
+   "web_name": "Roefs",
+   "element_type": 1,
+   "team": 16,
+   "total_points": 0,
+   "points_per_game": "0.0",
+   "minutes": 0,
+   "goals_scored": 0,
+   "assists": 0,
+   "clean_sheets": 0,
+   "saves": 0,
+   "status": "a",
+   "news": "",
+   "form": "0.0",
+   "ict_index": "0.0",
+   "draft_rank": 93,
+   "chance_of_playing_this_round": null
+  },
+  {
+   "id": 112,
+   "code": 200111,
+   "first_name": "Enzo",
+   "second_name": "Le Fée",
+   "web_name": "Le Fée",
+   "element_type": 3,
+   "team": 16,
+   "total_points": 18,
+   "points_per_game": "6.0",
+   "minutes": 240,
+   "goals_scored": 1,
+   "assists": 0,
+   "clean_sheets": 0,
+   "saves": 0,
+   "status": "a",
+   "news": "",
+   "form": "0.0",
+   "ict_index": "11.3",
+   "draft_rank": 109,
    "chance_of_playing_this_round": null
   }
  ],
