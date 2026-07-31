@@ -5,6 +5,7 @@ import BestAvailable from "./components/BestAvailable.jsx";
 import Roster from "./components/Roster.jsx";
 import Chat from "./components/Chat.jsx";
 import LeaguePanel from "./components/LeaguePanel.jsx";
+import FixturesTab from "./components/FixturesTab.jsx";
 
 const SQUAD_LIMITS = { GKP: 2, DEF: 5, MID: 5, FWD: 3 };
 const POLL_MS = 10000;
@@ -27,6 +28,8 @@ export default function App() {
   const [players, setPlayers] = useState([]);
   const [dataSource, setDataSource] = useState("");
   const [loadError, setLoadError] = useState("");
+  const [fixtures, setFixtures] = useState(null);
+  const [fixturesSource, setFixturesSource] = useState("");
 
   const [leagueId, setLeagueId] = useState(() => load("fplda.leagueId", ""));
   const [league, setLeague] = useState(null);
@@ -43,6 +46,8 @@ export default function App() {
       .then((d) => {
         setPlayers(d.players || []);
         setDataSource(d.source || "");
+        setFixtures(d.fixtures || null);
+        setFixturesSource(d.fixturesSource || "");
       })
       .catch((e) => setLoadError(String(e.message || e)));
   }, []);
@@ -120,6 +125,15 @@ export default function App() {
     save("fplda.manualMarks", {});
   }, []);
 
+  // Fixture runs keyed by the main-game short name each player was joined to,
+  // so the board and cards can look them up without re-matching names.
+  const fixturesByTeam = useMemo(() => {
+    const map = {};
+    for (const team of fixtures?.teams || []) map[team.shortName] = team.run;
+    return map;
+  }, [fixtures]);
+  const fixturesAvailable = (fixtures?.teams || []).length > 0;
+
   const available = useMemo(() => players.filter((p) => !draftedBy[p.id]), [players, draftedBy]);
   const myRoster = useMemo(
     () => players.filter((p) => draftedBy[p.id]?.mine),
@@ -131,7 +145,12 @@ export default function App() {
       .map((pos) => {
         const top = available.filter((p) => p.position === pos).slice(0, 5);
         return top
-          .map((p) => `${p.name} (${p.teamShort}, ${pos}, ${p.projectedPoints} pts, VORP ${p.vorp})`)
+          .map(
+            (p) =>
+              `${p.name} (${p.teamShort}, ${pos}, ${p.projectedPoints} pts, VORP ${p.vorp}, GW1-6 difficulty ${
+                p.fixtureAverage ?? "unknown"
+              })`
+          )
           .join(", ");
       })
       .map((s, i) => `${["GKP", "DEF", "MID", "FWD"][i]}: ${s || "none left"}`)
@@ -177,6 +196,7 @@ export default function App() {
         {[
           ["board", "Draft board"],
           ["best", "Best available"],
+          ["fixtures", "Fixtures"],
           ["roster", `My team (${myRoster.length}/15)`],
           ["league", "League"],
           ["chat", "AI assistant"],
@@ -197,11 +217,19 @@ export default function App() {
 
       <main className="content">
         {tab === "board" && (
-          <DraftBoard players={players} draftedBy={draftedBy} onMark={markPlayer} onReset={resetMarks} />
+          <DraftBoard
+            players={players}
+            draftedBy={draftedBy}
+            onMark={markPlayer}
+            onReset={resetMarks}
+            fixturesByTeam={fixturesByTeam}
+            fixturesAvailable={fixturesAvailable}
+          />
         )}
         {tab === "best" && (
           <BestAvailable available={available} myRoster={myRoster} limits={SQUAD_LIMITS} onMark={markPlayer} />
         )}
+        {tab === "fixtures" && <FixturesTab fixtures={fixtures} fixturesSource={fixturesSource} />}
         {tab === "roster" && <Roster myRoster={myRoster} limits={SQUAD_LIMITS} onMark={markPlayer} />}
         {tab === "league" && (
           <LeaguePanel

@@ -1,4 +1,5 @@
 import React from "react";
+import { averageLabel } from "./FixtureRun.jsx";
 
 const ORDER = ["MID", "FWD", "DEF", "GKP"];
 
@@ -25,6 +26,9 @@ export default function BestAvailable({ available, myRoster, limits, onMark }) {
                   <div className="pname">{p.name}</div>
                   <div className="pmeta">
                     {p.teamShort} · {p.projectedPoints} pts · VORP {p.vorp}
+                  </div>
+                  <div className="pmeta">
+                    GW1-6 difficulty {averageLabel(p.fixtureAverage)}
                   </div>
                 </div>
                 <button className="mark mine" onClick={() => onMark(p.id, "me")} title="Draft to my team">

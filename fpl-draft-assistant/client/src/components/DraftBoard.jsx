@@ -1,12 +1,141 @@
-import React, { useMemo, useState } from "react";
+import React, { memo, useCallback, useMemo, useState } from "react";
+import FixtureRun, { averageLabel } from "./FixtureRun.jsx";
 
 const POSITIONS = ["ALL", "GKP", "DEF", "MID", "FWD"];
 
-export default function DraftBoard({ players, draftedBy, onMark, onReset }) {
+function weightLabel(weight) {
+  return `${Math.round((Number(weight) || 0) * 100)}%`;
+}
+
+/** The four component scores, shown only once a row is expanded. */
+function Breakdown({ player, run }) {
+  const b = player.breakdown || {};
+  const w = b.weights || {};
+  const rows = [
+    { key: "historical", label: "Last season", value: b.historical, weight: w.historical },
+    { key: "draftRank", label: "FPL draft rank", value: b.draftRank, weight: w.draftRank },
+    { key: "fixtures", label: "Opening fixtures", value: b.fixtures, weight: w.fixtures },
+    { key: "availability", label: "Availability", value: b.availability, weight: w.availability },
+  ];
+  return (
+    <div className="breakdown">
+      <p className="breakdown-summary">{b.summary || "No ranking explanation available."}</p>
+      <ul className="breakdown-list">
+        {rows.map((row) => (
+          <li key={row.key} className={row.value === null || row.value === undefined ? "muted" : ""}>
+            <span className="breakdown-label">{row.label}</span>
+            <span className="breakdown-value">
+              {row.value === null || row.value === undefined ? "no signal" : row.value}
+            </span>
+            <span className="breakdown-weight">{weightLabel(row.weight)}</span>
+          </li>
+        ))}
+      </ul>
+      <div className="breakdown-fixtures">
+        <span className="breakdown-label">
+          GW1-6 {b.fixtureAverage !== null && b.fixtureAverage !== undefined
+            ? `(average ${averageLabel(b.fixtureAverage)})`
+            : ""}
+        </span>
+        <FixtureRun run={run} labelled />
+      </div>
+      {player.news && <p className="breakdown-news">{player.news}</p>}
+    </div>
+  );
+}
+
+const PlayerRow = memo(function PlayerRow({
+  player,
+  draftLabel,
+  draftMine,
+  expanded,
+  run,
+  showFixtures,
+  columnCount,
+  onMark,
+  onToggle,
+}) {
+  const drafted = Boolean(draftLabel);
+  const rowClass = drafted ? (draftMine ? "row-mine" : "row-gone") : "";
+  const toggle = (event) => {
+    event.stopPropagation();
+    onToggle(player.id);
+  };
+  const mark = (event, value) => {
+    // Marking a player should not also expand the row.
+    event.stopPropagation();
+    onMark(player.id, value);
+  };
+  return (
+    <>
+      <tr className={`row-tappable ${rowClass} ${expanded ? "row-open" : ""}`.trim()} onClick={toggle}>
+        <td className="num rank">{player.rank}</td>
+        <td>
+          <button
+            type="button"
+            className="row-expand"
+            aria-expanded={expanded}
+            onClick={toggle}
+            title="Show why this player is ranked here"
+          >
+            <span className="pname">
+              {player.name}
+              <span className="row-caret" aria-hidden="true">
+                {expanded ? "▾" : "▸"}
+              </span>
+            </span>
+            <span className="pmeta">
+              {player.teamShort}
+              {player.news ? ` · ${player.news}` : ""}
+            </span>
+          </button>
+        </td>
+        <td>
+          <span className={`pos pos-${player.position}`}>{player.position}</span>
+        </td>
+        {showFixtures && (
+          <td className="hide-sm">
+            <FixtureRun run={run} />
+          </td>
+        )}
+        <td className="num strong">{player.projectedPoints}</td>
+        <td className="num">{player.vorp}</td>
+        <td className="num hide-sm">{player.lastSeasonPoints}</td>
+        <td className="num hide-sm">{player.ppg}</td>
+        <td>
+          {drafted ? (
+            <button className="mark marked" onClick={(e) => mark(e, null)} title="Undo">
+              {draftLabel}
+            </button>
+          ) : (
+            <span className="mark-group">
+              <button className="mark mine" onClick={(e) => mark(e, "me")} title="I drafted this player">
+                Mine
+              </button>
+              <button className="mark gone" onClick={(e) => mark(e, "gone")} title="Someone else drafted them">
+                Gone
+              </button>
+            </span>
+          )}
+        </td>
+      </tr>
+      {expanded && (
+        <tr className="breakdown-row">
+          <td colSpan={columnCount}>
+            <Breakdown player={player} run={run} />
+          </td>
+        </tr>
+      )}
+    </>
+  );
+});
+
+export default function DraftBoard({ players, draftedBy, onMark, onReset, fixturesByTeam, fixturesAvailable }) {
   const [pos, setPos] = useState("ALL");
   const [query, setQuery] = useState("");
   const [hideDrafted, setHideDrafted] = useState(false);
   const [limit, setLimit] = useState(100);
+  const [expanded, setExpanded] = useState(null);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -18,6 +147,9 @@ export default function DraftBoard({ players, draftedBy, onMark, onReset }) {
       return true;
     });
   }, [players, pos, query, hideDrafted, draftedBy]);
+
+  const visible = useMemo(() => filtered.slice(0, limit), [filtered, limit]);
+  const toggle = useCallback((id) => setExpanded((current) => (current === id ? null : id)), []);
 
   return (
     <section>
@@ -45,6 +177,11 @@ export default function DraftBoard({ players, draftedBy, onMark, onReset }) {
         </button>
       </div>
 
+      <p className="board-hint">
+        Tap a player to see why they are ranked there
+        {fixturesAvailable ? "" : ". Opening fixtures are unavailable, so ranks use last season and FPL draft rank only"}
+      </p>
+
       <div className="table-wrap">
         <table className="board">
           <thead>
@@ -52,50 +189,30 @@ export default function DraftBoard({ players, draftedBy, onMark, onReset }) {
               <th className="num">#</th>
               <th>Player</th>
               <th>Pos</th>
+              {fixturesAvailable && <th className="hide-sm">GW1-6</th>}
               <th className="num">Proj</th>
               <th className="num">VORP</th>
-              <th className="num hide-sm">24/25 pts</th>
+              <th className="num hide-sm">25/26 pts</th>
               <th className="num hide-sm">PPG</th>
               <th>Status</th>
             </tr>
           </thead>
           <tbody>
-            {filtered.slice(0, limit).map((p) => {
+            {visible.map((p) => {
               const d = draftedBy[p.id];
               return (
-                <tr key={p.id} className={d ? (d.mine ? "row-mine" : "row-gone") : ""}>
-                  <td className="num rank">{p.rank}</td>
-                  <td>
-                    <div className="pname">{p.name}</div>
-                    <div className="pmeta">
-                      {p.teamShort}
-                      {p.news ? ` · ${p.news}` : ""}
-                    </div>
-                  </td>
-                  <td>
-                    <span className={`pos pos-${p.position}`}>{p.position}</span>
-                  </td>
-                  <td className="num strong">{p.projectedPoints}</td>
-                  <td className="num">{p.vorp}</td>
-                  <td className="num hide-sm">{p.lastSeasonPoints}</td>
-                  <td className="num hide-sm">{p.ppg}</td>
-                  <td>
-                    {d ? (
-                      <button className="mark marked" onClick={() => onMark(p.id, null)} title="Undo">
-                        {d.label}
-                      </button>
-                    ) : (
-                      <span className="mark-group">
-                        <button className="mark mine" onClick={() => onMark(p.id, "me")} title="I drafted this player">
-                          Mine
-                        </button>
-                        <button className="mark gone" onClick={() => onMark(p.id, "gone")} title="Someone else drafted them">
-                          Gone
-                        </button>
-                      </span>
-                    )}
-                  </td>
-                </tr>
+                <PlayerRow
+                  key={p.id}
+                  player={p}
+                  draftLabel={d ? d.label : ""}
+                  draftMine={Boolean(d && d.mine)}
+                  expanded={expanded === p.id}
+                  run={fixturesByTeam ? fixturesByTeam[p.fixtureTeam] : null}
+                  showFixtures={fixturesAvailable}
+                  columnCount={fixturesAvailable ? 9 : 8}
+                  onMark={onMark}
+                  onToggle={toggle}
+                />
               );
             })}
           </tbody>

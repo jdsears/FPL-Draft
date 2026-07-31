@@ -4,10 +4,35 @@ import Avatar from "./Avatar.jsx";
 
 const SUGGESTIONS = [
   "Who should I take with my next pick?",
+  "Any transfer or injury news I should know before drafting?",
   "Best strategy for a 10-team snake draft?",
   "When should I draft my goalkeepers?",
   "Rate my team so far",
 ];
+
+function sourceLabel(source) {
+  if (source.title) return source.title;
+  try {
+    return new URL(source.url).hostname.replace(/^www\./, "");
+  } catch {
+    return source.url;
+  }
+}
+
+/** Citations from Nova's web searches, shown under her reply. */
+function Sources({ sources }) {
+  if (!sources || !sources.length) return null;
+  return (
+    <div className="sources">
+      <span className="sources-label">Sources</span>
+      {sources.map((s) => (
+        <a key={s.url} className="source-link" href={s.url} target="_blank" rel="noreferrer noopener">
+          {sourceLabel(s)}
+        </a>
+      ))}
+    </div>
+  );
+}
 
 export default function Chat({ context }) {
   const [messages, setMessages] = useState([]);
@@ -29,8 +54,8 @@ export default function Chat({ context }) {
     setMessages(next);
     setBusy(true);
     try {
-      const reply = await sendChat(next, context);
-      setMessages((m) => [...m, { role: "assistant", content: reply }]);
+      const { reply, sources } = await sendChat(next, context);
+      setMessages((m) => [...m, { role: "assistant", content: reply, sources }]);
     } catch (e) {
       setError(String(e.message || e));
       setMessages(messages);
@@ -66,10 +91,13 @@ export default function Chat({ context }) {
           </div>
         )}
         {messages.map((m, i) => (
-          <div key={i} className={`msg-row ${m.role}`}>
-            {m.role === "assistant" && <Avatar size={28} />}
-            <div className={`msg ${m.role}`}>{m.content}</div>
-          </div>
+          <React.Fragment key={i}>
+            <div className={`msg-row ${m.role}`}>
+              {m.role === "assistant" && <Avatar size={28} />}
+              <div className={`msg ${m.role}`}>{m.content}</div>
+            </div>
+            {m.role === "assistant" && <Sources sources={m.sources} />}
+          </React.Fragment>
         ))}
         {busy && (
           <div className="msg-row assistant">
