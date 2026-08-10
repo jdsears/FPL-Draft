@@ -28,6 +28,14 @@ const NAME_ALIASES = {
   sheffieldutd: "sheffieldunited",
   lutontown: "luton",
   ipswichtown: "ipswich",
+  coventrycity: "coventry",
+  hullcity: "hull",
+  leicestercity: "leicester",
+  stokecity: "stoke",
+  norwichcity: "norwich",
+  cardiffcity: "cardiff",
+  swanseacity: "swansea",
+  birminghamcity: "birmingham",
 };
 
 export function normaliseTeamName(value) {

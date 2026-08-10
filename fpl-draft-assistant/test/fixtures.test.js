@@ -86,6 +86,63 @@ test("draft-game teams join to main-game teams by name, not id", () => {
   assert.equal(findFixtureTeam(null, { name: "Arsenal" }), null);
 });
 
+test("every 2026/27 club joins from the draft game to the main game", () => {
+  // Draft-game names and short names, taken from a live draft bootstrap.
+  const draftTeams = [
+    [1, "Arsenal", "ARS"],
+    [2, "Aston Villa", "AVL"],
+    [3, "Bournemouth", "BOU"],
+    [4, "Brentford", "BRE"],
+    [5, "Brighton", "BHA"],
+    [6, "Chelsea", "CHE"],
+    [7, "Coventry City", "COV"],
+    [8, "Crystal Palace", "CRY"],
+    [9, "Everton", "EVE"],
+    [10, "Fulham", "FUL"],
+    [11, "Hull City", "HUL"],
+    [12, "Ipswich Town", "IPS"],
+    [13, "Leeds", "LEE"],
+    [14, "Liverpool", "LIV"],
+    [15, "Man City", "MCI"],
+    [16, "Man Utd", "MUN"],
+    [17, "Newcastle", "NEW"],
+    [18, "Nott'm Forest", "NFO"],
+    [19, "Spurs", "TOT"],
+    [20, "Sunderland", "SUN"],
+  ].map(([id, name, short_name]) => ({ id, name, short_name }));
+
+  // The main game names some clubs differently and uses its own ids. Both the
+  // matching short name and a differing full name must resolve.
+  const mainTeams = draftTeams.map((t, i) => ({
+    id: 500 + i,
+    short_name: t.short_name,
+    name: { "Coventry City": "Coventry", "Hull City": "Hull", "Ipswich Town": "Ipswich" }[t.name] || t.name,
+  }));
+
+  const fixtures = mainTeams.map((t, i) => ({
+    event: 1,
+    team_h: t.id,
+    team_a: mainTeams[(i + 1) % mainTeams.length].id,
+    team_h_difficulty: 3,
+    team_a_difficulty: 3,
+  }));
+  const index = indexFixtureTeams(buildFixtureContext(mainTeams, fixtures).teams);
+
+  for (const team of draftTeams) {
+    const hit = findFixtureTeam(index, team);
+    assert.ok(hit, `no fixture join for ${team.name} (${team.short_name})`);
+    assert.equal(hit.shortName, team.short_name);
+  }
+
+  // The join must also survive a main game that only differs by full name,
+  // which is what the alias table is for.
+  const noShortNames = mainTeams.map((t) => ({ id: t.id, name: t.name, short_name: "" }));
+  const nameOnly = indexFixtureTeams(buildFixtureContext(noShortNames, fixtures).teams);
+  for (const team of draftTeams) {
+    assert.ok(findFixtureTeam(nameOnly, team), `no name-only join for ${team.name}`);
+  }
+});
+
 test("team names normalise across punctuation, accents and known aliases", () => {
   assert.equal(normaliseTeamName("Nott'm Forest"), normaliseTeamName("Nottingham Forest"));
   assert.equal(normaliseTeamName("Man Utd"), normaliseTeamName("Manchester United"));
