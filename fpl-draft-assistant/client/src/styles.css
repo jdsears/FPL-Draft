@@ -142,6 +142,10 @@ table.board { width: 100%; border-collapse: collapse; background: var(--panel); 
 .mark.marked { background: var(--panel-2); color: var(--muted); }
 
 .board-hint { font-size: 13px; color: var(--muted); margin: 0 0 10px; }
+.warn-hint {
+  color: var(--warn); background: rgba(255, 207, 92, 0.1);
+  border-radius: 10px; padding: 8px 12px; line-height: 1.45;
+}
 
 /* Row expand: the whole row is tappable, the player cell carries the
    affordance and keeps a 44px hit area on touch screens. */

@@ -130,7 +130,15 @@ const PlayerRow = memo(function PlayerRow({
   );
 });
 
-export default function DraftBoard({ players, draftedBy, onMark, onReset, fixturesByTeam, fixturesAvailable }) {
+export default function DraftBoard({
+  players,
+  draftedBy,
+  onMark,
+  onReset,
+  fixturesByTeam,
+  fixturesAvailable,
+  historyAvailable = true,
+}) {
   const [pos, setPos] = useState("ALL");
   const [query, setQuery] = useState("");
   const [hideDrafted, setHideDrafted] = useState(false);
@@ -181,6 +189,13 @@ export default function DraftBoard({ players, draftedBy, onMark, onReset, fixtur
         Tap a player to see why they are ranked there
         {fixturesAvailable ? "" : ". Opening fixtures are unavailable, so ranks use last season and FPL draft rank only"}
       </p>
+      {!historyAvailable && (
+        <p className="board-hint warn-hint">
+          FPL has reset last season's points for the new season, so the board is ranking on FPL's own
+          draft order, the opening fixtures and injury flags. Last season's totals will read zero
+          until the new season's numbers start arriving.
+        </p>
+      )}
 
       <div className="table-wrap">
         <table className="board">

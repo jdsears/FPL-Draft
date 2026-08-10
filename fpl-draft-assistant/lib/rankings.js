@@ -104,18 +104,46 @@ function historicalProjection(element) {
   return { total, ppg, mins, historical: Math.round(blend) };
 }
 
+/**
+ * Plausible season totals per position, used only when there is no historical
+ * data at all to price the draft order against. Top is roughly a first-round
+ * pick's season, floor is roughly replacement level.
+ */
+export const POSITION_POINT_CURVE = {
+  1: { top: 165, floor: 55 }, // GKP
+  2: { top: 175, floor: 55 }, // DEF
+  3: { top: 265, floor: 55 }, // MID
+  4: { top: 235, floor: 55 }, // FWD
+};
+
+/** A convex decay down the draft order, so elite picks keep a real gap. */
+function curvePoints(elementType, index, count) {
+  const { top, floor } = POSITION_POINT_CURVE[elementType] || POSITION_POINT_CURVE[3];
+  if (count <= 1) return top;
+  const share = Math.min(1, index / (count - 1));
+  return Math.round(floor + (top - floor) * Math.pow(1 - share, 1.6));
+}
+
 // FPL publishes an expert draft order but no expected points. Map each
 // position's draft order onto that position's spread of historical
 // projections, so the best-rated defender is priced like the best-scoring
 // defender. That keeps the signal in points and rescues players whose own
 // record is thin.
-function assignDraftRankScores(rows) {
+//
+// When a new season starts, FPL resets every player's points and minutes in
+// the bootstrap, so that spread is all zeros and would price the whole draft
+// order at nothing. In that case fall back to a synthetic curve, which keeps
+// the board ordered on the expert signal until real form arrives.
+function assignDraftRankScores(rows, elementType) {
   const spread = rows.map((r) => r.historical).sort((a, b) => b - a);
+  const useCurve = !spread.some((value) => value > 0);
   const ordered = rows
     .filter((r) => Number.isFinite(r.draftRank))
     .sort((a, b) => a.draftRank - b.draftRank);
   ordered.forEach((row, i) => {
-    row.draftRankScore = spread[i] ?? spread[spread.length - 1] ?? 0;
+    row.draftRankScore = useCurve
+      ? curvePoints(elementType, i, ordered.length)
+      : spread[i] ?? spread[spread.length - 1] ?? 0;
   });
 }
 
@@ -155,11 +183,13 @@ function availabilityPhrase(status, chance, news, factor) {
  * Example: "Ranked 12: strong 2025/26 output, FPL's draft order puts them 8th
  * overall, gentle opening fixtures (difficulty 2.3), no injury flags."
  */
-function describeRank(player, positionSpread) {
+function describeRank(player, positionSpread, historyAvailable = true) {
   const b = player.breakdown;
   const parts = [];
 
-  if (player.minutes <= 0) {
+  if (!historyAvailable) {
+    parts.push(`${PREVIOUS_SEASON} totals not published for the new season`);
+  } else if (player.minutes <= 0) {
     parts.push(`no ${PREVIOUS_SEASON} Premier League minutes`);
   } else if (player.minutes < LOW_MINUTES_THRESHOLD) {
     parts.push(`only ${player.minutes} Premier League minutes in ${PREVIOUS_SEASON}`);
@@ -178,7 +208,7 @@ function describeRank(player, positionSpread) {
   parts.push(availabilityPhrase(player.status, player.chanceOfPlaying, player.news, b.availabilityFactor));
 
   const weighting =
-    b.lowMinutes && Number.isFinite(player.draftRank)
+    b.lowMinutes && Number.isFinite(player.draftRank) && historyAvailable
       ? ", so the rank leans on expert opinion rather than history"
       : "";
   return `Ranked ${player.rank}: ${parts.join(", ")}${weighting}.`;
@@ -224,8 +254,15 @@ export function buildRankings(bootstrap, options = {}) {
   // Draft rank is priced within each position, so the conversion is fair
   // between a top goalkeeper and a top midfielder.
   for (const etype of Object.keys(SQUAD_SLOTS)) {
-    assignDraftRankScores(rows.filter((r) => r.e.element_type === Number(etype)));
+    assignDraftRankScores(
+      rows.filter((r) => r.e.element_type === Number(etype)),
+      Number(etype)
+    );
   }
+
+  // FPL zeroes last season's points and minutes when the new season's game
+  // goes live, so the board has to say what it is actually ranking on.
+  const historyAvailable = rows.some((r) => r.mins > 0 || r.total > 0);
   const spreads = Object.fromEntries(
     Object.keys(SQUAD_SLOTS).map((etype) => [
       etype,
@@ -338,7 +375,7 @@ export function buildRankings(bootstrap, options = {}) {
 
   ranked.forEach((p, i) => {
     p.rank = i + 1;
-    p.breakdown.summary = describeRank(p, spreads[p.elementType] || []);
+    p.breakdown.summary = describeRank(p, spreads[p.elementType] || [], historyAvailable);
   });
 
   return {
@@ -347,5 +384,6 @@ export function buildRankings(bootstrap, options = {}) {
     teamsInLeague,
     weights: { default: RANKING_WEIGHTS, lowMinutes: LOW_MINUTES_WEIGHTS, lowMinutesThreshold: LOW_MINUTES_THRESHOLD },
     fixturesAvailable,
+    historyAvailable,
   };
 }

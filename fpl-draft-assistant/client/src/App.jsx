@@ -30,6 +30,7 @@ export default function App() {
   const [loadError, setLoadError] = useState("");
   const [fixtures, setFixtures] = useState(null);
   const [fixturesSource, setFixturesSource] = useState("");
+  const [historyAvailable, setHistoryAvailable] = useState(true);
 
   const [leagueId, setLeagueId] = useState(() => load("fplda.leagueId", ""));
   const [league, setLeague] = useState(null);
@@ -48,6 +49,7 @@ export default function App() {
         setDataSource(d.source || "");
         setFixtures(d.fixtures || null);
         setFixturesSource(d.fixturesSource || "");
+        setHistoryAvailable(d.historyAvailable !== false);
       })
       .catch((e) => setLoadError(String(e.message || e)));
   }, []);
@@ -224,6 +226,7 @@ export default function App() {
             onReset={resetMarks}
             fixturesByTeam={fixturesByTeam}
             fixturesAvailable={fixturesAvailable}
+            historyAvailable={historyAvailable}
           />
         )}
         {tab === "best" && (

@@ -137,6 +137,54 @@ test("a player under the minutes threshold is scored on the expert draft rank", 
   assert.match(newcomer.breakdown.summary, /leans on expert opinion/);
 });
 
+test("a fresh season with every stat reset still ranks on the draft order", () => {
+  // FPL zeroes points, minutes and points per game when the new season's game
+  // goes live, which would otherwise price the whole draft order at nothing.
+  const fresh = (id, draftRank, elementType = 3) =>
+    element({
+      id,
+      web_name: `P${id}`,
+      element_type: elementType,
+      total_points: 0,
+      minutes: 0,
+      points_per_game: "0.0",
+      draft_rank: draftRank,
+    });
+
+  // One position, so the draft order maps straight onto the board. Across
+  // positions VORP reorders on purpose, which the next assertions allow for.
+  const result = buildRankings(
+    bootstrap([fresh(1, 1), fresh(2, 2), fresh(3, 3), fresh(4, 4), fresh(5, 20), fresh(6, 40)])
+  );
+
+  assert.equal(result.historyAvailable, false);
+  assert.deepEqual(
+    result.players.map((p) => p.name),
+    ["P1", "P2", "P3", "P4", "P5", "P6"],
+    "the board should follow FPL's draft order"
+  );
+  for (const player of result.players) {
+    assert.ok(player.projectedPoints > 0, `${player.name} should not score zero`);
+    assert.ok(player.breakdown.draftRank > 0);
+    assert.match(player.breakdown.summary, /not published for the new season/);
+  }
+  // Strictly descending, so there are no ties to break arbitrarily.
+  const scores = result.players.map((p) => p.projectedPoints);
+  assert.deepEqual(scores, [...scores].sort((a, b) => b - a));
+  assert.ok(new Set(scores).size > 1, "scores must separate players");
+
+  // Positions are priced separately, so a top forward is not dragged down by a
+  // deeper midfield pool.
+  const mixed = buildRankings(bootstrap([fresh(1, 1, 3), fresh(2, 2, 4), fresh(3, 3, 1), fresh(4, 4, 2)]));
+  for (const player of mixed.players) assert.ok(player.projectedPoints > 0, `${player.name} scores`);
+  assert.equal(new Set(mixed.players.map((p) => p.position)).size, 4);
+
+  // Historical data present: the curve stays out of the way.
+  const normal = buildRankings(bootstrap([element(), element({ id: 2, web_name: "Other", draft_rank: 2 })]));
+  assert.equal(normal.historyAvailable, true);
+  assert.equal(normal.players[0].breakdown.draftRank, normal.players[0].breakdown.historical);
+});
+
 test("a player with no draft rank falls back to the historical signal alone", () => {
   const result = buildRankings(bootstrap([element({ draft_rank: null })]));
   const player = byName(result, "Player");
