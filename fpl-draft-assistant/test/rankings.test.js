@@ -4,6 +4,7 @@ import fs from "node:fs";
 
 import {
   buildRankings,
+  hasLeftTheLeague,
   availabilityFactor,
   fixtureFactor,
   RANKING_WEIGHTS,
@@ -263,6 +264,62 @@ test("an injured player ranks below an identical fit player", () => {
   assert.ok(injured.projectedPoints > 0);
   assert.equal(result.players.length, 3);
   assert.match(injured.breakdown.summary, /injured/);
+});
+
+test("players who have left the Premier League are dropped from the board", () => {
+  // Wording taken verbatim from a live draft bootstrap.
+  const departures = [
+    "Has joined Paris Saint-Germain permanently",
+    "Has joined Como permanently",
+    "Has joined Elche on loan for the rest of the season",
+    "Has joined Sheffield Wednesday on loan for the rest of the season",
+    "has returned to Getafe CF",
+    "Has joined New England Revolution permanently",
+  ];
+  for (const news of departures) {
+    assert.equal(hasLeftTheLeague("u", news), true, news);
+  }
+
+  // Unavailable for other reasons, or flagged but still at the club: keep them.
+  assert.equal(hasLeftTheLeague("u", ""), false);
+  assert.equal(hasLeftTheLeague("u", "Not in squad"), false);
+  assert.equal(hasLeftTheLeague("i", "Hamstring injury - Unknown return date"), false);
+  assert.equal(hasLeftTheLeague("a", "Has joined the squad after a loan spell"), false);
+  assert.equal(hasLeftTheLeague("d", "Knock, 75% chance of playing"), false);
+  assert.equal(hasLeftTheLeague(null, null), false);
+
+  const result = buildRankings(
+    bootstrap([
+      element({ id: 1, web_name: "Stays", draft_rank: 2 }),
+      element({
+        id: 2,
+        web_name: "Departed",
+        status: "u",
+        news: "Has joined Como permanently",
+        draft_rank: 1,
+      }),
+      element({
+        id: 3,
+        web_name: "Injured",
+        status: "i",
+        news: "Knee injury - Unknown return date",
+        draft_rank: 3,
+      }),
+    ])
+  );
+
+  assert.deepEqual(
+    result.players.map((p) => p.name),
+    ["Stays", "Injured"],
+    "the departed player should be gone, the injured one merely discounted"
+  );
+  assert.equal(result.departedExcluded, 1);
+
+  // Their absence must not leave a gap in the draft-rank conversion: the top
+  // remaining player still gets the position's best price.
+  const stays = byName(result, "Stays");
+  assert.equal(stays.breakdown.draftRank, stays.breakdown.historical);
+  assert.equal(buildRankings(bootstrap([element()])).departedExcluded, 0);
 });
 
 test("availability factors discount by status, chance of playing and news", () => {

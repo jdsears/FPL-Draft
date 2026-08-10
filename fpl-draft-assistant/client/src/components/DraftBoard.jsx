@@ -138,6 +138,7 @@ export default function DraftBoard({
   fixturesByTeam,
   fixturesAvailable,
   historyAvailable = true,
+  departedExcluded = 0,
 }) {
   const [pos, setPos] = useState("ALL");
   const [query, setQuery] = useState("");
@@ -188,6 +189,9 @@ export default function DraftBoard({
       <p className="board-hint">
         Tap a player to see why they are ranked there
         {fixturesAvailable ? "" : ". Opening fixtures are unavailable, so ranks use last season and FPL draft rank only"}
+        {departedExcluded > 0
+          ? `. ${departedExcluded} player${departedExcluded === 1 ? "" : "s"} who have left the Premier League are hidden`
+          : ""}
       </p>
       {!historyAvailable && (
         <p className="board-hint warn-hint">

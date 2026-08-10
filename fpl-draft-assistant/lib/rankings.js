@@ -62,6 +62,18 @@ export const AVAILABILITY_FACTORS = {
 const NEWS_ONLY_FACTOR = 0.97;
 const MIN_AVAILABILITY_FACTOR = 0.2;
 
+/**
+ * FPL keeps players in the pool after they leave the Premier League, marked
+ * unavailable with news like "Has joined Como permanently" or "Has joined
+ * Elche on loan for the rest of the season". They cannot score, so drafting
+ * one wastes a pick and they are dropped from the board entirely.
+ */
+const DEPARTURE_NEWS = /\b(has joined|has left|has returned to)\b/i;
+
+export function hasLeftTheLeague(status, news) {
+  return String(status || "").toLowerCase() === "u" && DEPARTURE_NEWS.test(String(news || ""));
+}
+
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 const round1 = (value) => Math.round(value * 10) / 10;
 
@@ -229,7 +241,11 @@ export function buildRankings(bootstrap, options = {}) {
   const fixturesAvailable = fixtureTeams.length > 0;
   const fixtureIndex = fixturesAvailable ? indexFixtureTeams(fixtureTeams) : null;
 
-  const elements = bootstrap?.elements || [];
+  // Departed players are dropped before anything else, so they cannot skew the
+  // replacement levels or the draft-rank conversion either.
+  const allElements = bootstrap?.elements || [];
+  const elements = allElements.filter((e) => !hasLeftTheLeague(e.status, e.news));
+  const departedExcluded = allElements.length - elements.length;
   const teams = new Map((bootstrap?.teams || []).map((t) => [t.id, t]));
 
   const rows = elements.map((e) => {
@@ -385,5 +401,6 @@ export function buildRankings(bootstrap, options = {}) {
     weights: { default: RANKING_WEIGHTS, lowMinutes: LOW_MINUTES_WEIGHTS, lowMinutesThreshold: LOW_MINUTES_THRESHOLD },
     fixturesAvailable,
     historyAvailable,
+    departedExcluded,
   };
 }
