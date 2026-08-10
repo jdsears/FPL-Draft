@@ -310,6 +310,45 @@ table.board { width: 100%; border-collapse: collapse; background: var(--panel); 
   border-top: 1px solid var(--line); background: var(--panel-2);
 }
 
+/* Cheat sheet: on screen it matches the app, in print it goes to paper */
+.cheat-head { display: none; }
+.cheat-first {
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: 12px; padding: 12px; margin-bottom: 12px;
+}
+.cheat h3 {
+  display: flex; align-items: center; gap: 8px;
+  margin: 0 0 8px; font-size: 15px;
+}
+.cheat-count { font-size: 12px; color: var(--muted); font-weight: 400; }
+.cheat-first-list {
+  margin: 0; padding-left: 22px;
+  columns: 3; column-gap: 18px; font-size: 13px; line-height: 1.6;
+}
+.cheat-first-list li { break-inside: avoid; }
+.cheat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.cheat-col {
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: 12px; padding: 12px; break-inside: avoid;
+}
+.cheat-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.cheat-table th {
+  text-align: left; font-size: 12px; color: var(--muted); font-weight: 600;
+  padding: 4px 6px; border-bottom: 1px solid var(--line);
+}
+.cheat-table th.num, .cheat-table td.num { text-align: right; }
+.cheat-table td { padding: 4px 6px; border-bottom: 1px solid rgba(52, 42, 71, 0.5); }
+.cheat-table tr:last-child td { border-bottom: none; }
+.cheat-name { font-weight: 600; }
+.cheat-meta { font-size: 12px; color: var(--muted); }
+.cheat-flag { font-size: 12px; font-weight: 700; color: var(--warn); white-space: nowrap; }
+.cheat-notes {
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: 12px; padding: 12px; margin-top: 12px;
+}
+.cheat-notes ul { margin: 0; padding-left: 20px; font-size: 12.5px; line-height: 1.6; }
+.cheat-notes li { break-inside: avoid; }
+
 /* Banners */
 .banner {
   padding: 10px 14px; border-radius: 10px; margin: 10px 0; font-size: 14px;
@@ -318,7 +357,8 @@ table.board { width: 100%; border-collapse: collapse; background: var(--panel); 
 
 /* Mobile: stack columns, keep touch targets at 44px, no horizontal scroll */
 @media (max-width: 760px) {
-  .best-grid, .roster { grid-template-columns: repeat(2, 1fr); }
+  .best-grid, .roster, .cheat-grid { grid-template-columns: repeat(2, 1fr); }
+  .cheat-first-list { columns: 2; }
   .hide-sm { display: none; }
   .board th, .board td { padding: 8px 8px; }
   .controls { gap: 6px; }
@@ -334,11 +374,40 @@ table.board { width: 100%; border-collapse: collapse; background: var(--panel); 
   .fdr-legend { margin-left: 0; }
 }
 @media (max-width: 420px) {
-  .best-grid, .roster { grid-template-columns: 1fr; }
+  .best-grid, .roster, .cheat-grid { grid-template-columns: 1fr; }
+  .cheat-first-list { columns: 1; }
   body { font-size: 14px; }
   .msg { max-width: 88%; }
   .league-form { flex-direction: column; }
   /* Chips and breakdown text stay at 12px, never smaller. */
   .breakdown-summary { font-size: 13px; }
   .fixtures-card .fdr-run { gap: 4px; }
+}
+
+/* Print: paper backup for draft night. Only the cheat sheet goes to the
+   printer, in black on white, with the on-screen controls stripped out. */
+@media print {
+  body { background: #fff; color: #000; font-size: 9.5pt; }
+  .app { max-width: none; padding: 0; }
+  .topbar, .tabs, .banner, .cheat-controls { display: none !important; }
+  .content { padding-top: 0; }
+  .cheat-head { display: block; margin-bottom: 8pt; }
+  .cheat-head h2 { margin: 0 0 2pt; font-size: 14pt; }
+  .cheat-head p { margin: 0; font-size: 8.5pt; color: #333; }
+  .cheat h3 { font-size: 10.5pt; margin-bottom: 3pt; }
+  .cheat-first, .cheat-col, .cheat-notes {
+    background: none; border: 1px solid #999; border-radius: 0;
+    padding: 6pt; margin-bottom: 6pt;
+  }
+  .cheat-grid { grid-template-columns: repeat(4, 1fr); gap: 6pt; }
+  .cheat-first-list { columns: 5; font-size: 8.5pt; line-height: 1.35; }
+  .cheat-table { font-size: 8pt; }
+  .cheat-table th { color: #000; border-bottom: 1px solid #000; padding: 2pt 3pt; }
+  .cheat-table td { border-bottom: 1px solid #ddd; padding: 1.5pt 3pt; }
+  .cheat-meta, .cheat-count { color: #444; }
+  .cheat-flag { color: #000; }
+  .cheat-notes ul { font-size: 8pt; line-height: 1.4; }
+  /* Position labels lose their colour fill, so keep them legible as outlines. */
+  .pos { background: none !important; color: #000 !important; border: 1px solid #000; padding: 0 3pt; }
+  a[href]::after { content: ""; }
 }

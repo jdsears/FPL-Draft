@@ -6,6 +6,7 @@ import Roster from "./components/Roster.jsx";
 import Chat from "./components/Chat.jsx";
 import LeaguePanel from "./components/LeaguePanel.jsx";
 import FixturesTab from "./components/FixturesTab.jsx";
+import CheatSheet from "./components/CheatSheet.jsx";
 
 const SQUAD_LIMITS = { GKP: 2, DEF: 5, MID: 5, FWD: 3 };
 const POLL_MS = 10000;
@@ -203,6 +204,7 @@ export default function App() {
           ["fixtures", "Fixtures"],
           ["roster", `My team (${myRoster.length}/15)`],
           ["league", "League"],
+          ["cheat", "Cheat sheet"],
           ["chat", "AI assistant"],
         ].map(([key, label]) => (
           <button
@@ -247,6 +249,7 @@ export default function App() {
             onSetEntry={onSetEntry}
           />
         )}
+        {tab === "cheat" && <CheatSheet players={players} fixturesAvailable={fixturesAvailable} />}
         {tab === "chat" && <Chat context={chatContext} />}
       </main>
     </div>

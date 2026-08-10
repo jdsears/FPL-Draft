@@ -97,6 +97,13 @@ for (const width of WIDTHS) {
       },
     ],
     [
+      "cheat-sheet",
+      async () => {
+        await page.getByRole("tab", { name: "Cheat sheet" }).click();
+        await page.waitForSelector(".cheat, .card");
+      },
+    ],
+    [
       "chat",
       async () => {
         await page.getByRole("tab", { name: "AI assistant" }).click();
