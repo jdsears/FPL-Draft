@@ -147,6 +147,29 @@ table.board { width: 100%; border-collapse: collapse; background: var(--panel); 
   border-radius: 10px; padding: 8px 12px; line-height: 1.45;
 }
 
+/* Live pick sync: says whether picks are still arriving */
+.sync-bar {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
+  padding: 6px 12px; border-radius: 10px; margin-bottom: 4px;
+  background: rgba(0, 255, 135, 0.08); border: 1px solid rgba(0, 255, 135, 0.2);
+  font-size: 13px; color: var(--accent);
+}
+.sync-bar.sync-warn {
+  background: rgba(255, 207, 92, 0.1); border-color: rgba(255, 207, 92, 0.3);
+  color: var(--warn);
+}
+.sync-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: currentColor; flex-shrink: 0;
+}
+.sync-message { flex: 1; min-width: 0; line-height: 1.4; overflow-wrap: anywhere; }
+.sync-now { min-height: 32px; font-size: 12px; color: inherit; position: relative; }
+/* Keep a 44px hit area without a 44px-tall bar. */
+.sync-now::after {
+  content: ""; position: absolute; left: 0; right: 0;
+  top: 50%; height: 44px; transform: translateY(-50%);
+}
+
 /* Row expand: the whole row is tappable, the player cell carries the
    affordance and keeps a 44px hit area on touch screens. */
 .row-tappable { cursor: pointer; }
@@ -389,7 +412,7 @@ table.board { width: 100%; border-collapse: collapse; background: var(--panel); 
 @media print {
   body { background: #fff; color: #000; font-size: 9.5pt; }
   .app { max-width: none; padding: 0; }
-  .topbar, .tabs, .banner, .cheat-controls { display: none !important; }
+  .topbar, .tabs, .banner, .sync-bar, .cheat-controls { display: none !important; }
   .content { padding-top: 0; }
   .cheat-head { display: block; margin-bottom: 8pt; }
   .cheat-head h2 { margin: 0 0 2pt; font-size: 14pt; }

@@ -7,6 +7,7 @@ import Chat from "./components/Chat.jsx";
 import LeaguePanel from "./components/LeaguePanel.jsx";
 import FixturesTab from "./components/FixturesTab.jsx";
 import CheatSheet from "./components/CheatSheet.jsx";
+import SyncStatus from "./components/SyncStatus.jsx";
 
 const SQUAD_LIMITS = { GKP: 2, DEF: 5, MID: 5, FWD: 3 };
 const POLL_MS = 10000;
@@ -73,10 +74,17 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Poll live draft picks while a league is connected.
+  // Poll live draft picks while a league is connected, and record whether the
+  // poll is actually succeeding so the interface can say so.
   const pollRef = useRef(null);
+  const pollNowRef = useRef(null);
+  const [sync, setSync] = useState({ at: null, error: "", picks: 0 });
+
   useEffect(() => {
-    if (!leagueId || !league) return undefined;
+    if (!leagueId || !league) {
+      pollNowRef.current = null;
+      return undefined;
+    }
     const poll = () =>
       fetchChoices(leagueId)
         .then((d) => {
@@ -85,12 +93,19 @@ export default function App() {
             if (c.element) picks[c.element] = { entryId: c.entry, pick: c.index, round: c.round };
           }
           setLivePicks(picks);
+          setSync({ at: Date.now(), error: "", picks: Object.keys(picks).length });
         })
-        .catch(() => {});
+        .catch((e) => setSync((s) => ({ ...s, error: String(e.message || e) })));
+    pollNowRef.current = poll;
     poll();
     pollRef.current = setInterval(poll, POLL_MS);
-    return () => clearInterval(pollRef.current);
+    return () => {
+      clearInterval(pollRef.current);
+      pollNowRef.current = null;
+    };
   }, [leagueId, league]);
+
+  const syncNow = useCallback(() => pollNowRef.current?.(), []);
 
   const entries = league?.league_entries || [];
   const entryName = useCallback(
@@ -218,6 +233,10 @@ export default function App() {
           </button>
         ))}
       </nav>
+
+      {leagueId && league && (
+        <SyncStatus syncedAt={sync.at} error={sync.error} picks={sync.picks} onSyncNow={syncNow} />
+      )}
 
       {loadError && <div className="banner error">Could not load player data: {loadError}</div>}
 

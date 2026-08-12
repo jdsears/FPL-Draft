@@ -213,7 +213,7 @@ export default function DraftBoard({
               <th className="num">VORP</th>
               <th className="num hide-sm">25/26 pts</th>
               <th className="num hide-sm">PPG</th>
-              <th>Status</th>
+              <th>Mark</th>
             </tr>
           </thead>
           <tbody>
