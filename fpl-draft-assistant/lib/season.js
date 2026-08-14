@@ -102,11 +102,14 @@ function describe(player) {
  *   window          gameweeks in the planning horizon
  *   baseline        optional { [code]: { pointsPerGame, appearances } } from a
  *                   pre-season snapshot, used as an early-season prior
+ *   corrections     optional { GKP, DEF, MID, FWD } multipliers learned from how
+ *                   past projections actually turned out (see lib/learning.js)
  */
 export function buildSeasonProjections(bootstrap, options = {}) {
   const window = options.window || PLANNING_WINDOW;
   const currentEvent = Math.max(0, Number(options.currentEvent) || 0);
   const baseline = options.baseline || null;
+  const corrections = options.corrections || null;
   const fixtureTeams = options.fixtureContext?.teams || [];
   const fixturesAvailable = fixtureTeams.length > 0;
   const fixtureIndex = fixturesAvailable ? indexFixtureTeams(fixtureTeams) : null;
@@ -138,6 +141,11 @@ export function buildSeasonProjections(bootstrap, options = {}) {
           totalWeight
         : 0;
 
+    // What past gameweeks say this position's projections are worth. Neutral
+    // until there is enough evidence to say otherwise.
+    const position = POSITIONS[e.element_type] || "?";
+    const correction = Number(corrections?.[position]) || 1;
+
     const team = teams.get(e.team) || {};
     const fixtureTeam = fixtureIndex ? findFixtureTeam(fixtureIndex, team) : null;
     const fixtureAverage = fixtureTeam ? fixtureTeam.average : null;
@@ -146,7 +154,7 @@ export function buildSeasonProjections(bootstrap, options = {}) {
     const fixtureFactor = seasonFixtureFactor(fixtureAverage);
     const availability = availabilityFactor(e.status, e.chance_of_playing_this_round, e.news);
 
-    const perPlayedFixture = perFixture * fixtureFactor * availability;
+    const perPlayedFixture = perFixture * fixtureFactor * availability * correction;
     const windowPoints = perPlayedFixture * playProbability * fixtures;
 
     const player = {
@@ -154,7 +162,7 @@ export function buildSeasonProjections(bootstrap, options = {}) {
       code: e.code,
       name: e.web_name,
       fullName: `${e.first_name} ${e.second_name}`.trim(),
-      position: POSITIONS[e.element_type] || "?",
+      position,
       elementType: e.element_type,
       teamId: e.team,
       teamShort: team.short_name || "",
@@ -178,6 +186,7 @@ export function buildSeasonProjections(bootstrap, options = {}) {
         form,
         weights,
         preSeason,
+        correction: round2(correction),
         summary: "",
       },
     };
@@ -196,6 +205,7 @@ export function buildSeasonProjections(bootstrap, options = {}) {
     fixturesAvailable,
     baselineAvailable: Boolean(baseline),
     weights: SEASON_WEIGHTS,
+    corrections,
   };
 }
 

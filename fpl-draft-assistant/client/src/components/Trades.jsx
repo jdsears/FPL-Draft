@@ -76,7 +76,7 @@ function Rival({ rival, open, onToggle }) {
   );
 }
 
-export default function Trades({ leagueId, myEntryId, myElements }) {
+export default function Trades({ leagueId, myEntryId, myElements, corrections }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -92,6 +92,7 @@ export default function Trades({ leagueId, myEntryId, myElements }) {
       leagueId,
       myEntryId: myEntryId || null,
       elements: mineKey ? mineKey.split(",").map(Number) : [],
+      corrections,
     })
       .then((d) => {
         setData(d);
@@ -100,7 +101,7 @@ export default function Trades({ leagueId, myEntryId, myElements }) {
       })
       .catch((e) => setError(String(e.message || e)))
       .finally(() => setLoading(false));
-  }, [leagueId, myEntryId, mineKey]);
+  }, [leagueId, myEntryId, mineKey, corrections]);
 
   useEffect(load, [load]);
 

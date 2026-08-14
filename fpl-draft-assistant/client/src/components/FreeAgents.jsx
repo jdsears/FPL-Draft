@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { fetchFreeAgents } from "../api.js";
 import FixtureRun from "./FixtureRun.jsx";
+import { deadlineLine } from "./MyWeek.jsx";
 
 // There is no transfer market in a draft league, only the players nobody owns.
 // The useful question is never "who is good" but "is the best unowned player in
@@ -43,7 +44,14 @@ function AgentRow({ player, run, expanded, onToggle }) {
   );
 }
 
-export default function FreeAgents({ leagueId, myEntryId, myElements, ownedElements }) {
+export default function FreeAgents({
+  leagueId,
+  myEntryId,
+  myElements,
+  ownedElements,
+  corrections,
+  onLoaded,
+}) {
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -61,11 +69,15 @@ export default function FreeAgents({ leagueId, myEntryId, myElements, ownedEleme
       myEntryId: myEntryId || null,
       elements: mineKey ? mineKey.split(",").map(Number) : [],
       ownedElements: ownedKey ? ownedKey.split(",").map(Number) : [],
+      corrections,
     })
-      .then(setData)
+      .then((d) => {
+        setData(d);
+        onLoaded?.(d);
+      })
       .catch((e) => setError(String(e.message || e)))
       .finally(() => setLoading(false));
-  }, [leagueId, myEntryId, mineKey, ownedKey]);
+  }, [leagueId, myEntryId, mineKey, ownedKey, corrections, onLoaded]);
 
   useEffect(load, [load]);
 
@@ -96,6 +108,8 @@ export default function FreeAgents({ leagueId, myEntryId, myElements, ownedEleme
           {loading ? "Updating" : "Refresh"}
         </button>
       </div>
+
+      {data?.deadline && <p className="pmeta week-deadline">{deadlineLine(data.deadline)}</p>}
 
       {error && <div className="banner error">Could not load free agents: {error}</div>}
       {data?.ownershipSource === "picks" && (

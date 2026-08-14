@@ -94,6 +94,9 @@ export async function getMainGameData({ allowSample = false } = {}) {
     return {
       teams: bootstrap.teams || [],
       fixtures: Array.isArray(fixtures) ? fixtures : [],
+      // The main game publishes each gameweek's deadline, which the draft game
+      // shares because the matches are the same.
+      events: bootstrap.events || [],
       source: "live",
     };
   } catch (err) {
@@ -104,12 +107,13 @@ export async function getMainGameData({ allowSample = false } = {}) {
         return {
           teams: sample.teams || [],
           fixtures: sample.fixtures || [],
+          events: sample.events || [],
           source: "sample",
           error,
         };
       }
     }
-    return { teams: [], fixtures: [], source: "unavailable", error };
+    return { teams: [], fixtures: [], events: [], source: "unavailable", error };
   }
 }
 
@@ -124,6 +128,14 @@ export async function getDraftChoices(leagueId) {
 
 export async function getElementStatus(leagueId) {
   return getJson(`${BASE}/league/${leagueId}/element-status`, 30 * 1000);
+}
+
+/**
+ * What every player actually scored in one gameweek. Finished gameweeks never
+ * change, so they are cached for a long time; a live one is kept brief.
+ */
+export async function getEventLive(event, { finished = false } = {}) {
+  return getJson(`${BASE}/event/${event}/live`, finished ? SIX_HOURS : 60 * 1000);
 }
 
 export async function getGameStatus() {

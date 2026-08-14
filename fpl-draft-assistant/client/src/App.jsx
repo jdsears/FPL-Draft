@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { fetchBootstrap, fetchLeague, fetchChoices } from "./api.js";
+import { fetchBootstrap, fetchLeague, fetchChoices, fetchLearning } from "./api.js";
+import { scopeFor, readLog, recordProjection } from "./learning.js";
 import DraftBoard from "./components/DraftBoard.jsx";
 import BestAvailable from "./components/BestAvailable.jsx";
 import Roster from "./components/Roster.jsx";
@@ -12,6 +13,7 @@ import MyWeek from "./components/MyWeek.jsx";
 import FreeAgents from "./components/FreeAgents.jsx";
 import SeasonView from "./components/SeasonView.jsx";
 import Trades from "./components/Trades.jsx";
+import Learning from "./components/Learning.jsx";
 
 const SQUAD_LIMITS = { GKP: 2, DEF: 5, MID: 5, FWD: 3 };
 const POLL_MS = 10000;
@@ -45,6 +47,27 @@ function tabsFor(seasonMode, rosterSize) {
     ["week", "My week"],
   ];
   return seasonMode ? season : draft;
+}
+
+/** A deadline as something readable, with how long is left. */
+function deadlineInWords(deadline) {
+  if (!deadline?.at) return null;
+  const when = new Date(deadline.at);
+  if (Number.isNaN(when.getTime())) return null;
+  const stamp = when.toLocaleString("en-GB", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  const hours = Number(deadline.hoursAway);
+  if (!Number.isFinite(hours)) return stamp;
+  if (hours < 0) return `${stamp}, which has passed`;
+  if (hours < 1) return `${stamp}, in under an hour`;
+  if (hours < 24) return `${stamp}, in ${Math.round(hours)} hours`;
+  const days = Math.round(hours / 24);
+  return `${stamp}, in ${days} ${days === 1 ? "day" : "days"}`;
 }
 
 function ordinal(n) {
@@ -89,6 +112,14 @@ export default function App() {
   // Null until the user picks one, so the landing tab can follow whether the
   // draft is still to come.
   const [chosenTab, setTab] = useState(null);
+
+  // What past gameweeks say about the projections, and what the weekly views
+  // concluded, so Nova can reason from the app's own answers.
+  const [learning, setLearning] = useState(null);
+  const [learningError, setLearningError] = useState("");
+  const [logVersion, setLogVersion] = useState(0);
+  const [week, setWeek] = useState(null);
+  const [agents, setAgents] = useState(null);
 
   useEffect(() => {
     fetchBootstrap()
@@ -152,6 +183,10 @@ export default function App() {
   }, [leagueId, league]);
 
   const syncNow = useCallback(() => pollNowRef.current?.(), []);
+
+  // Held in a ref so recording a projection does not re-run every time the
+  // opponent object is rebuilt by a pick poll.
+  const opponentRef = useRef(null);
 
   const entries = league?.league_entries || [];
   const entryName = useCallback(
@@ -256,6 +291,8 @@ export default function App() {
     };
   }, [league, myLeagueEntry, entries, nextEvent, squadsByEntry]);
 
+  opponentRef.current = opponent?.name || null;
+
   const chatContext = useMemo(() => {
     const best = ["GKP", "DEF", "MID", "FWD"]
       .map((pos) => {
@@ -292,14 +329,86 @@ export default function App() {
       gameweek: seasonMode ? nextEvent : null,
       opponent: opponent?.name || null,
       opponentSquad,
+      // The app's own conclusions, so she reasons from them rather than
+      // rederiving them from a player list.
+      lineup: week?.lineup?.playable
+        ? week.lineup.starters
+            .map((p) => `${p.name} (${p.position}, ${Number(p.season?.perGameweek || 0).toFixed(1)})`)
+            .join(", ")
+        : null,
+      bench: week?.lineup?.bench?.length
+        ? week.lineup.bench.map((p) => `${p.name} (${p.position})`).join(", ")
+        : null,
+      projection: week?.lineup?.playable
+        ? `your eleven ${week.lineup.expected.toFixed(1)} in ${week.lineup.label}` +
+          (week.opponent ? `, theirs ${week.opponent.expected.toFixed(1)}` : "")
+        : null,
+      warnings: (week?.lineup?.warnings || []).map((w) => `${w.name || "squad"}: ${w.detail}`),
+      claims: (agents?.upgrades || []).map((u) => u.summary),
+      deadline: week?.deadline ? deadlineInWords(week.deadline) : null,
+      learning: learning?.summary || [],
     };
-  }, [available, myRoster, livePicks, players, entryName, dataSource, seasonMode, nextEvent, opponent]);
+  }, [
+    available,
+    myRoster,
+    livePicks,
+    players,
+    entryName,
+    dataSource,
+    seasonMode,
+    nextEvent,
+    opponent,
+    week,
+    agents,
+    learning,
+  ]);
 
   // The draft is one evening; the season is every week, so once the draft is
   // done the week leads. A tab that disappears with the draft falls back rather
   // than leaving a blank page.
   const tabs = tabsFor(seasonMode, myRoster.length);
   const tab = chosenTab && tabs.some(([key]) => key === chosenTab) ? chosenTab : tabs[0][0];
+
+  // ---- Learning ----
+  const logScope = scopeFor(leagueId, myEntryId);
+  const corrections = learning?.corrections || null;
+
+  const loadLearning = useCallback(() => {
+    if (!leagueId || !myEntryId) {
+      setLearning(null);
+      return;
+    }
+    setLearningError("");
+    fetchLearning({ leagueId, myEntryId, log: readLog(scopeFor(leagueId, myEntryId)) })
+      .then(setLearning)
+      .catch((e) => setLearningError(String(e.message || e)));
+  }, [leagueId, myEntryId]);
+
+  useEffect(loadLearning, [loadLearning, logVersion]);
+
+  // The projection for a gameweek has to be written down before it is played,
+  // because afterwards the inputs have moved on and it cannot be recovered.
+  const onWeek = useCallback(
+    (data) => {
+      setWeek(data);
+      if (!data?.lineup?.playable || !data.nextEvent) return;
+      recordProjection(logScope, {
+        event: data.nextEvent,
+        projected: data.lineup.expected,
+        opponentProjected: data.opponent ? data.opponent.expected : null,
+        opponentName: opponentRef.current,
+        players: data.lineup.starters.map((p) => ({
+          id: p.id,
+          name: p.name,
+          position: p.position,
+          projected: p.season?.perGameweek,
+        })),
+      });
+    },
+    [logScope]
+  );
+
+  const onRestored = useCallback(() => setLogVersion((v) => v + 1), []);
 
   const onSetLeague = (id) => {
     setLeagueId(id);
@@ -358,6 +467,8 @@ export default function App() {
             leagueConnected={Boolean(league)}
             leagueId={leagueId}
             myEntryId={myEntryId}
+            corrections={corrections}
+            onLoaded={onWeek}
           />
         )}
         {tab === "season" && (
@@ -365,6 +476,10 @@ export default function App() {
             leagueId={leagueId}
             myLeagueEntryId={myLeagueEntry?.id || null}
             squadsByEntryId={squadsByEntry}
+            corrections={corrections}
+            learning={learning}
+            learningError={learningError}
+            onRestored={onRestored}
           />
         )}
         {tab === "agents" && (
@@ -373,10 +488,17 @@ export default function App() {
             myEntryId={myEntryId}
             myElements={myElements}
             ownedElements={ownedElements}
+            corrections={corrections}
+            onLoaded={setAgents}
           />
         )}
         {tab === "trades" && (
-          <Trades leagueId={leagueId} myEntryId={myEntryId} myElements={myElements} />
+          <Trades
+            leagueId={leagueId}
+            myEntryId={myEntryId}
+            myElements={myElements}
+            corrections={corrections}
+          />
         )}
         {tab === "board" && (
           <DraftBoard

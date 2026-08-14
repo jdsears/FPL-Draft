@@ -467,6 +467,24 @@ table.board { width: 100%; border-collapse: collapse; background: var(--panel); 
 }
 .sos-row .week-main .pmeta { display: block; line-height: 1.5; }
 
+/* Learning: projected against actual, and what changed as a result */
+.week-deadline { font-weight: 600; color: var(--warn); }
+.form-missed { outline: 1px dashed currentColor; outline-offset: 1px; }
+.learn-positions { list-style: none; margin: 0; padding: 0; }
+.learn-positions li {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 0; border-bottom: 1px solid var(--line);
+}
+.learn-positions li:last-child { border-bottom: none; }
+.learn-positions .pmeta { flex: 1; min-width: 0; margin: 0; }
+.learn-backup { margin-top: 10px; }
+.learn-paste {
+  width: 100%; margin: 8px 0; padding: 10px;
+  background: var(--panel-2); color: var(--text);
+  border: 1px solid var(--line); border-radius: 10px;
+  font-family: inherit; font-size: 12px; resize: vertical;
+}
+
 /* Banners */
 .banner {
   padding: 10px 14px; border-radius: 10px; margin: 10px 0; font-size: 14px;

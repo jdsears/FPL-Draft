@@ -12,7 +12,8 @@
 // Environment: APP_URL (default http://127.0.0.1:3000), SHOT_DIR (default
 // ./screenshots), CHROMIUM_PATH to reuse a browser already on the machine,
 // LEAGUE_ID and ENTRY_ID to start with a league already connected so the
-// head-to-head panel is on screen.
+// head-to-head panel is on screen, and SEED_LOG=1 to plant a few gameweeks of
+// recorded projections so the learning card has something to draw.
 
 import { chromium } from "playwright";
 import fs from "node:fs";
@@ -82,6 +83,28 @@ for (const width of WIDTHS) {
         if (entry) localStorage.setItem("fplda.myEntryId", JSON.stringify(Number(entry)));
       },
       { league: process.env.LEAGUE_ID, entry: process.env.ENTRY_ID }
+    );
+  }
+  if (process.env.SEED_LOG === "1") {
+    // The learning card only exists once projections have been recorded, and
+    // those are written before a gameweek is played, so there is no way to get
+    // them retrospectively. Plant a plausible few.
+    await page.addInitScript(
+      ({ scope }) => {
+        // Low element ids, so they exist in the bundled demo pool too.
+        const players = [
+          { id: 1, name: "Keeper", position: "GKP", projected: 4 },
+          { id: 2, name: "Defender", position: "DEF", projected: 2.8 },
+          { id: 3, name: "Midfielder", position: "MID", projected: 7.2 },
+          { id: 4, name: "Forward", position: "FWD", projected: 5 },
+        ];
+        const events = {};
+        for (let event = 1; event <= 5; event++) {
+          events[event] = { event, at: "2026-08-20T00:00:00.000Z", projected: 38.2, opponentProjected: 41.3, players };
+        }
+        localStorage.setItem("fplda.projectionLog", JSON.stringify({ [scope]: events }));
+      },
+      { scope: `${process.env.LEAGUE_ID}:${process.env.ENTRY_ID}` }
     );
   }
   await page.goto(BASE, { waitUntil: "networkidle" });

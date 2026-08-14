@@ -7,6 +7,7 @@ import {
   getLeagueDetails,
   getDraftChoices,
   getElementStatus,
+  getEventLive,
   getGameStatus,
   readBaseline,
   captureBaseline,
@@ -18,6 +19,7 @@ import { pickLineup } from "./lib/lineup.js";
 import { buildWaiverBoard } from "./lib/waivers.js";
 import { buildSeasonOverview } from "./lib/league.js";
 import { suggestTrades } from "./lib/trades.js";
+import { buildLearning, correctionsFrom, normaliseCorrections } from "./lib/learning.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -62,7 +64,7 @@ app.get("/api/bootstrap", async (_req, res) => {
  * board's valuation. Used by the season list and the weekly lineup alike so
  * both always speak about players in the same numbers.
  */
-async function projectSeason(windowRequest) {
+async function projectSeason(windowRequest, corrections = null) {
   const window = Math.min(Math.max(Number(windowRequest) || PLANNING_WINDOW, 1), 10);
   const { data, source } = await getBootstrap();
   if (source === "live") captureBaseline(data, buildBaseline);
@@ -79,14 +81,33 @@ async function projectSeason(windowRequest) {
     currentEvent,
     window,
     baseline: readBaseline()?.players || null,
+    corrections: normaliseCorrections(corrections),
   });
-  return { source, fixturesSource: main.source, fixtureContext, projections };
+  return {
+    source,
+    fixturesSource: main.source,
+    fixtureContext,
+    projections,
+    deadline: nextDeadline(main.events, currentEvent + 1),
+  };
+}
+
+/**
+ * When the next gameweek locks. Comes from the main game, which publishes the
+ * deadline the draft game shares, because the matches are the same.
+ */
+function nextDeadline(events, event) {
+  const row = (events || []).find((e) => Number(e.id) === Number(event));
+  if (!row?.deadline_time) return null;
+  const at = new Date(row.deadline_time);
+  if (Number.isNaN(at.getTime())) return null;
+  return { event: Number(event), at: row.deadline_time, hoursAway: (at.getTime() - Date.now()) / 3600000 };
 }
 
 app.get("/api/season", async (req, res) => {
   try {
-    const { source, fixturesSource, fixtureContext, projections } = await projectSeason(req.query.window);
-    res.json({ source, fixturesSource, fixtures: fixtureContext, ...projections });
+    const { source, fixturesSource, fixtureContext, projections, deadline } = await projectSeason(req.query.window);
+    res.json({ source, fixturesSource, fixtures: fixtureContext, deadline, ...projections });
   } catch (err) {
     res.status(500).json({ error: String(err.message || err) });
   }
@@ -110,7 +131,10 @@ app.post("/api/my-week", async (req, res) => {
 
     const me = squadOf(req.body?.myEntryId, req.body?.elements);
     const them = squadOf(req.body?.opponentEntryId, req.body?.opponentElements);
-    const { source, fixturesSource, fixtureContext, projections } = await projectSeason(req.body?.window);
+    const { source, fixturesSource, fixtureContext, projections, deadline } = await projectSeason(
+      req.body?.window,
+      req.body?.corrections
+    );
 
     const squadFor = (set) => projections.players.filter((p) => set.has(p.id));
     const mySquad = squadFor(me.elements);
@@ -122,6 +146,8 @@ app.post("/api/my-week", async (req, res) => {
       fixtures: fixtureContext,
       squadSource: me.fromFeed ? "league" : "marks",
       ownershipError: ownership.error,
+      deadline,
+      corrections: projections.corrections,
       currentEvent: projections.currentEvent,
       nextEvent: projections.currentEvent + 1,
       window: projections.window,
@@ -214,7 +240,10 @@ app.post("/api/free-agents", async (req, res) => {
     const owned = ownership.source === "league" ? ownership.owned : new Set(elementIds(req.body?.ownedElements));
     const mine = new Set(fromFeed || elementIds(req.body?.elements));
 
-    const { source, fixturesSource, fixtureContext, projections } = await projectSeason(req.body?.window);
+    const { source, fixturesSource, fixtureContext, projections, deadline } = await projectSeason(
+      req.body?.window,
+      req.body?.corrections
+    );
     const board = buildWaiverBoard(projections.players, { owned, mine });
 
     res.json({
@@ -227,6 +256,8 @@ app.post("/api/free-agents", async (req, res) => {
       squadSource: fromFeed ? "league" : "marks",
       waiver,
       transactionMode,
+      deadline,
+      corrections: projections.corrections,
       currentEvent: projections.currentEvent,
       nextEvent: projections.currentEvent + 1,
       window: projections.window,
@@ -274,7 +305,7 @@ app.post("/api/season-overview", async (req, res) => {
       if (squads.size) ownershipSource = "picks";
     }
 
-    const { source, projections } = await projectSeason(req.body?.window);
+    const { source, projections } = await projectSeason(req.body?.window, req.body?.corrections);
     const byId = new Map(projections.players.map((p) => [p.id, p]));
     const strengths = {};
     for (const [owner, elements] of squads) {
@@ -331,7 +362,7 @@ app.post("/api/trades", async (req, res) => {
     const entries = details?.league_entries || [];
     const ownership = await readOwnership(leagueId);
 
-    const { source, projections } = await projectSeason(req.body?.window);
+    const { source, projections } = await projectSeason(req.body?.window, req.body?.corrections);
     const byId = new Map(projections.players.map((p) => [p.id, p]));
     const squadOf = (elements) => (elements || []).map((id) => byId.get(id)).filter(Boolean);
 
@@ -396,6 +427,129 @@ app.get("/api/league/:id/element-status", async (req, res) => {
   } catch (err) {
     res.status(502).json({ error: String(err.message || err) });
   }
+});
+
+/**
+ * What the projections were worth. The client keeps the log of what was
+ * projected each gameweek, because it is the only thing here with storage that
+ * survives a redeploy. The actual scores come from the league's own match list,
+ * and the per-player detail from the gameweek's live feed when it answers.
+ */
+app.post("/api/learning", async (req, res) => {
+  try {
+    const leagueId = req.body?.leagueId;
+    const myEntryId = Number(req.body?.myEntryId) || null;
+    if (!leagueId || !myEntryId) return res.status(400).json({ error: "leagueId and myEntryId required" });
+
+    const details = await getLeagueDetails(leagueId);
+    const entries = details?.league_entries || [];
+    // The log is keyed by entry_id; matches work in league_entry ids.
+    const me = entries.find((e) => String(e.entry_id) === String(myEntryId));
+    if (!me) return res.status(404).json({ error: "That team is not in this league." });
+
+    const log = Array.isArray(req.body?.log) ? req.body.log : [];
+    const matches = details?.matches || [];
+    const scored = new Set(
+      matches.filter((m) => m.finished === true).map((m) => Number(m.event))
+    );
+
+    // Per-player results are a nicety: without them the overall figures still
+    // stand, only the per-position breakdown is missing.
+    const actuals = {};
+    let liveSource = "unavailable";
+    let liveError = "";
+    const wanted = [...new Set(log.map((e) => Number(e?.event)).filter((e) => e && scored.has(e)))];
+    for (const event of wanted) {
+      try {
+        const live = await getEventLive(event, { finished: true });
+        const elements = live?.elements;
+        if (!elements) continue;
+        const points = {};
+        // The feed has been seen keyed by element id; tolerate an array too.
+        const rows = Array.isArray(elements) ? elements.entries() : Object.entries(elements);
+        for (const [key, value] of rows) {
+          const total = value?.stats?.total_points ?? value?.total_points;
+          if (total !== undefined && total !== null) points[Number(value?.id ?? key)] = Number(total);
+        }
+        if (Object.keys(points).length) {
+          actuals[event] = points;
+          liveSource = "live";
+        }
+      } catch (err) {
+        liveError = String(err.message || err);
+      }
+    }
+
+    const learning = buildLearning({ log, matches, myEntryId: me.id, actuals });
+    res.json({
+      ...learning,
+      liveSource,
+      liveError,
+      scoredEvents: [...scored].sort((a, b) => a - b),
+      corrections: correctionsFrom(learning),
+    });
+  } catch (err) {
+    res.status(502).json({ error: String(err.message || err) });
+  }
+});
+
+/**
+ * Which upstream feeds actually answer from the server, which is a different
+ * question from whether they answer in a logged-in browser. One page to check
+ * rather than several URLs to try by hand.
+ */
+app.get("/api/health", async (req, res) => {
+  const leagueId = req.query.league;
+  const checks = [];
+  const check = async (name, note, run) => {
+    const started = Date.now();
+    try {
+      const detail = await run();
+      checks.push({ name, note, ok: true, ms: Date.now() - started, detail });
+    } catch (err) {
+      checks.push({ name, note, ok: false, ms: Date.now() - started, error: String(err.message || err) });
+    }
+  };
+
+  await check("draft bootstrap", "the player pool, and public", async () => {
+    const { data, source } = await getBootstrap();
+    if (source !== "live") throw new Error("falling back to the bundled demo data");
+    return `${(data.elements || []).length} players, gameweek ${data?.events?.current || 0} played`;
+  });
+  await check("main game", "fixture difficulty and deadlines", async () => {
+    const main = await getMainGameData();
+    if (main.source !== "live") throw new Error(main.error || "unreachable");
+    return `${main.teams.length} clubs, ${main.fixtures.length} fixtures, ${(main.events || []).length} gameweeks`;
+  });
+
+  if (leagueId) {
+    await check("league details", "standings, fixtures and who is in the league", async () => {
+      const details = await getLeagueDetails(leagueId);
+      const entries = (details?.league_entries || []).length;
+      if (!entries) throw new Error("answered, but with no entries");
+      return `${entries} teams, ${(details.matches || []).length} matches, draft ${details?.league?.draft_status || "unknown"}`;
+    });
+    await check("element status", "who owns whom, including waiver moves", async () => {
+      const rows = (await getElementStatus(leagueId))?.element_status || [];
+      const owned = rows.filter((r) => r.owner !== null && r.owner !== undefined).length;
+      if (!rows.length) throw new Error("answered, but with no rows");
+      return `${rows.length} players, ${owned} owned`;
+    });
+    await check("draft picks", "the draft itself, used as a fallback", async () => {
+      const choices = (await getDraftChoices(leagueId))?.choices || [];
+      return `${choices.length} picks`;
+    });
+  }
+
+  const failed = checks.filter((c) => !c.ok);
+  res.status(failed.length ? 207 : 200).json({
+    ok: failed.length === 0,
+    league: leagueId || null,
+    hint: leagueId
+      ? undefined
+      : "Add ?league=YOUR_LEAGUE_ID to also check the feeds behind the season, free agent and trade views.",
+    checks,
+  });
 });
 
 /**
@@ -523,7 +677,36 @@ function buildSystemPrompt(context, { webSearch = false } = {}) {
   if (context?.opponent) {
     lines.push(
       `The user's head-to-head opponent in gameweek ${gameweek} is ${context.opponent}.` +
-        (context.opponentSquad?.length ? ` Their squad from the draft: ${context.opponentSquad.join(", ")}.` : "")
+        (context.opponentSquad?.length ? ` Their squad: ${context.opponentSquad.join(", ")}.` : "")
+    );
+  }
+  // Nova should reason from the app's own conclusions rather than rederive them,
+  // and should be able to disagree with them out loud when she has a reason.
+  if (context?.lineup) {
+    lines.push(
+      `The app has worked out the user's best legal eleven for gameweek ${gameweek} and it is: ${context.lineup}. ` +
+        "Treat that as the starting point. If you would change it, say which player and why, in one line."
+    );
+  }
+  if (context?.bench) lines.push(`Left on the bench: ${context.bench}.`);
+  if (context?.projection) lines.push(`The projected gameweek: ${context.projection}.`);
+  if (context?.warnings?.length) {
+    lines.push(`Flags on the eleven the app picked: ${context.warnings.join("; ")}.`);
+  }
+  if (context?.claims?.length) {
+    lines.push(
+      // The summaries end in a full stop of their own, so trim before joining.
+      `Free agent claims the app rates as worthwhile, best first: ${context.claims
+        .map((claim) => String(claim).replace(/\.\s*$/, ""))
+        .join("; ")}. ` +
+        "These are same-position swaps, because the squad has to stay at 2 GKP, 5 DEF, 5 MID and 3 FWD."
+    );
+  }
+  if (context?.deadline) lines.push(`The gameweek ${gameweek} deadline is ${context.deadline}.`);
+  if (context?.learning?.length) {
+    lines.push(
+      "How the app's own projections have actually performed so far, which you should take into account and can quote:\n" +
+        context.learning.map((line) => `- ${line}`).join("\n")
     );
   }
   if (context?.nextPick) {

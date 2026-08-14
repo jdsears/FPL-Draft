@@ -23,6 +23,9 @@ gameweek it is.
   rivals are reflected.
 - **Trades**: every one-for-one swap with every rival, valued by re-picking both
   elevens, so you can see what a deal is worth to you and what it costs them.
+- **Learning**: each week the app writes down what it projected, then checks it
+  against what your league actually recorded, reports how far out it was, and
+  corrects itself. Shown on the Season tab.
 - **Draft board**: every player ranked by value over replacement (VORP), with
   projected points, last season's totals, injury news and the opening six
   fixtures. Filter by position, search by name or club. Tap any player to see
@@ -96,8 +99,10 @@ questions typically costs pennies rather than pounds.
    for.
 6. Use **Season** to see whether you are actually behind or just have a hard
    run of opponents left.
-7. Ask **Nova** about a close call. She knows which gameweek is next and who you
-   are playing.
+7. Ask **Nova** about a close call. She sees the eleven the app picked, your
+   opponent, the claims it rates, the deadline, and how its own projections have
+   actually been performing, so she argues from those rather than from a raw
+   player list, and can disagree with them.
 
 ## How the weekly projection works
 
@@ -118,6 +123,35 @@ fixtures rather than gameweeks.
 The eleven itself comes from `lib/lineup.js`, which enumerates every legal
 formation the squad can fill and picks the highest-scoring one exactly. There is
 no captain in this league, so the eleven is the whole weekly decision.
+
+## How the app learns
+
+A projection nobody checks is an opinion. So before each gameweek the app
+records the eleven it recommended and what it expected them to score. Afterwards
+your league publishes what they really scored, and the two get compared. The
+Season tab shows the result: how far out it has been, in which direction, and
+what it has changed as a result.
+
+Two rules stop this becoming superstition:
+
+- **Nothing is corrected from one week.** It takes two scored gameweeks before
+  any correction applies at all.
+- **Every correction is shrunk towards no correction**, in proportion to how
+  little evidence there is. With three gameweeks a correction moves about half
+  way to what the data suggests; with twelve it moves most of the way. One freak
+  week nudges the model, a settled pattern moves it. Corrections are also capped
+  either side of neutral, so the model can be adjusted but never rewritten.
+
+Per-position corrections work the same way but are shrunk towards the overall
+correction rather than towards neutral, because "defenders specifically are
+being over-rated" needs more evidence than "everything is being over-rated".
+Those need the per-player results feed; without it every position gets the same
+overall figure and the app says so.
+
+The record lives in your browser, because the only alternatives were a
+filesystem that gets wiped on deploy or a database this app does not have. That
+means it is per device, so there is a Copy backup button and a box to paste one
+back into on another device.
 
 ## How trades are valued
 
@@ -170,6 +204,15 @@ filesystem on every deploy. So the snapshot needs committing to the repository:
 Both refuse to run once a gameweek has been played, because by then the numbers
 they would capture are the new season's. If you miss the window nothing breaks:
 the model simply drops the prior and says so.
+
+## If something looks wrong
+
+Open `your-app-url/api/health?league=YOUR_LEAGUE_ID`. It reports which upstream
+feeds actually answer from the server, which is a different question from
+whether they answer in your logged-in browser. Anything reported as failing
+explains which part of the app degrades: without element status, squads fall
+back to the draft picks and waiver moves are invisible; without the main game,
+fixture difficulty and deadlines go missing.
 
 ## Notes
 

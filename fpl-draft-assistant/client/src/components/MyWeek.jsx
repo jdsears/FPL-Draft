@@ -21,6 +21,26 @@ function benchLabels(bench) {
   });
 }
 
+/** The deadline, and how long is left, in one line. */
+export function deadlineLine(deadline) {
+  const when = new Date(deadline?.at);
+  if (!deadline?.at || Number.isNaN(when.getTime())) return "";
+  const stamp = when.toLocaleString("en-GB", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  const hours = Number(deadline.hoursAway);
+  if (!Number.isFinite(hours)) return `Deadline ${stamp}.`;
+  if (hours < 0) return `The deadline passed on ${stamp}, so this eleven is locked in.`;
+  if (hours < 1) return `Deadline ${stamp}, under an hour away.`;
+  if (hours < 24) return `Deadline ${stamp}, ${Math.round(hours)} hours away.`;
+  const days = Math.round(hours / 24);
+  return `Deadline ${stamp}, ${days} ${days === 1 ? "day" : "days"} away.`;
+}
+
 const WARNING_TITLES = {
   unavailable: "Not available",
   suspended: "Suspended",
@@ -96,6 +116,8 @@ export default function MyWeek({
   leagueConnected,
   leagueId,
   myEntryId,
+  corrections,
+  onLoaded,
 }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
@@ -126,11 +148,17 @@ export default function MyWeek({
       opponentEntryId: opponent?.entryId || null,
       elements: mineKey ? mineKey.split(",").map(Number) : [],
       opponentElements: theirsKey ? theirsKey.split(",").map(Number) : [],
+      corrections,
     })
-      .then(setData)
+      .then((d) => {
+        setData(d);
+        // The parent records this week's projection, which can only be done
+        // before the gameweek is played.
+        onLoaded?.(d);
+      })
       .catch((e) => setError(String(e.message || e)))
       .finally(() => setLoading(false));
-  }, [mineKey, theirsKey, leagueId, myEntryId, opponent]);
+  }, [mineKey, theirsKey, leagueId, myEntryId, opponent, corrections, onLoaded]);
 
   useEffect(load, [load]);
 
@@ -181,6 +209,14 @@ export default function MyWeek({
           {loading ? "Updating" : "Refresh"}
         </button>
       </div>
+
+      {data?.deadline && <p className="pmeta week-deadline">{deadlineLine(data.deadline)}</p>}
+      {data?.corrections && (
+        <p className="pmeta">
+          These projections have been corrected using how past gameweeks actually turned out. The Season tab
+          shows by how much.
+        </p>
+      )}
 
       {error && <div className="banner error">Could not project this week: {error}</div>}
       {data?.source === "sample" && (

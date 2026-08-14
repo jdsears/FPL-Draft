@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { fetchSeasonOverview } from "../api.js";
+import Learning from "./Learning.jsx";
 
 // The league, read as a season rather than a draft. A head-to-head league is
 // not won by scoring the most points, it is won by beating the manager in front
@@ -38,7 +39,15 @@ function scheduleTone(strength, average) {
   return "";
 }
 
-export default function SeasonView({ leagueId, myLeagueEntryId, squadsByEntryId }) {
+export default function SeasonView({
+  leagueId,
+  myLeagueEntryId,
+  squadsByEntryId,
+  corrections,
+  learning,
+  learningError,
+  onRestored,
+}) {
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -53,11 +62,12 @@ export default function SeasonView({ leagueId, myLeagueEntryId, squadsByEntryId 
       leagueId,
       myEntryId: myLeagueEntryId || null,
       squadsByEntryId: JSON.parse(squadsKey),
+      corrections,
     })
       .then(setData)
       .catch((e) => setError(String(e.message || e)))
       .finally(() => setLoading(false));
-  }, [leagueId, myLeagueEntryId, squadsKey]);
+  }, [leagueId, myLeagueEntryId, squadsKey, corrections]);
 
   useEffect(load, [load]);
 
@@ -98,6 +108,8 @@ export default function SeasonView({ leagueId, myLeagueEntryId, squadsByEntryId 
       </div>
 
       {error && <div className="banner error">Could not read the league: {error}</div>}
+
+      <Learning learning={learning} error={learningError} onRestored={onRestored} />
       {data?.ownershipSource === "unavailable" && (
         <p className="pmeta">
           Squad ownership could not be read, so strength is unavailable and this shows results only.

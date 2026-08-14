@@ -29,6 +29,9 @@ export const fetchFreeAgents = (body) => postJson("/api/free-agents", body);
 /** The league table, every squad's strength, and the run of opponents left. */
 export const fetchSeasonOverview = (body) => postJson("/api/season-overview", body);
 
+/** How past projections actually turned out, and the corrections that follow. */
+export const fetchLearning = (body) => postJson("/api/learning", body);
+
 /** Every one-for-one swap with every rival, valued both ways. */
 export const fetchTrades = (body) => postJson("/api/trades", body);
 

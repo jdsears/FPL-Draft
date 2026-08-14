@@ -231,6 +231,34 @@ test("every player carries a plain-English weekly explanation", () => {
   assert.equal(result.currentEvent, 5);
 });
 
+test("a learned correction scales a position without touching the others", () => {
+  const elements = [
+    element({ id: 1, web_name: "Keeper", element_type: 1 }),
+    element({ id: 2, web_name: "Mid", element_type: 3 }),
+  ];
+  const plain = buildSeasonProjections(bootstrap(elements), {
+    fixtureContext: contextFor(),
+    currentEvent: 5,
+  });
+  const corrected = buildSeasonProjections(bootstrap(elements), {
+    fixtureContext: contextFor(),
+    currentEvent: 5,
+    corrections: { GKP: 0.8, DEF: 1, MID: 1, FWD: 1 },
+  });
+
+  const gkp = (r) => r.players.find((p) => p.position === "GKP");
+  const mid = (r) => r.players.find((p) => p.position === "MID");
+  assert.equal(gkp(plain).season.correction, 1);
+  assert.equal(gkp(corrected).season.correction, 0.8);
+  assert.ok(
+    Math.abs(gkp(corrected).season.perGameweek - gkp(plain).season.perGameweek * 0.8) < 0.02,
+    "the goalkeeper is marked down by exactly the correction"
+  );
+  assert.equal(mid(corrected).season.perGameweek, mid(plain).season.perGameweek, "the midfielder is untouched");
+  assert.deepEqual(corrected.corrections, { GKP: 0.8, DEF: 1, MID: 1, FWD: 1 });
+  assert.equal(plain.corrections, null);
+});
+
 test("empty and malformed bootstraps do not throw", () => {
   for (const input of [{}, { elements: [] }, undefined, { elements: [], teams: [] }]) {
     assert.deepEqual(buildSeasonProjections(input).players, []);
