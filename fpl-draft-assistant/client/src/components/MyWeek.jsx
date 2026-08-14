@@ -268,12 +268,16 @@ export default function MyWeek({
           <div className="scoreboard">
             <div className="scoreboard-side">
               <span className="scoreboard-team">{myName || "Your team"}</span>
-              <span className="scoreboard-value">{lineup ? lineup.expected.toFixed(1) : "0.0"}</span>
+              <span className={`scoreboard-value ${lineup && lineup.expected >= data.opponent.expected ? "lead" : ""}`.trim()}>
+                {lineup ? lineup.expected.toFixed(1) : "0.0"}
+              </span>
             </div>
             <span className="scoreboard-sep">projected</span>
             <div className="scoreboard-side scoreboard-them">
               <span className="scoreboard-team">{opponent?.name || "Opponent"}</span>
-              <span className="scoreboard-value">{data.opponent.expected.toFixed(1)}</span>
+              <span className={`scoreboard-value ${lineup && data.opponent.expected > lineup.expected ? "lead" : ""}`.trim()}>
+                {data.opponent.expected.toFixed(1)}
+              </span>
             </div>
           </div>
         ) : (
