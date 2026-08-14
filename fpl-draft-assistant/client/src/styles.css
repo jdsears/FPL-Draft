@@ -762,6 +762,11 @@ table.board { width: 100%; border-collapse: collapse; background: var(--panel); 
 .pitch-detail-note { color: var(--warn); }
 .pitch-hint { margin: 0; }
 
+/* Telling Nova something, without leaving the card */
+.tell-nova { display: flex; gap: 8px; margin: 10px 0 4px; }
+.tell-nova .search { min-width: 0; }
+.head-controls { margin: 0; flex-shrink: 0; }
+
 /* Team news notes */
 .week-news .week-row { align-items: flex-start; }
 .week-footnotes { margin: 0; line-height: 1.6; color: var(--muted-deep); }

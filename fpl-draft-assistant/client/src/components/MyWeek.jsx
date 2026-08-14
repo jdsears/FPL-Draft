@@ -96,6 +96,7 @@ export default function MyWeek({
   const [scouting, setScouting] = useState(false);
   const [scoutSaid, setScoutSaid] = useState("");
   const [scoutError, setScoutError] = useState("");
+  const [tip, setTip] = useState("");
 
   // Stable primitive keys so the fetch does not re-run on every render of the
   // parent, which re-derives these arrays each time picks are polled.
@@ -139,28 +140,52 @@ export default function MyWeek({
 
   // Checking the team news is Nova's job, not the user's. She searches, records
   // what she finds, and the recorded notes feed straight back into the eleven.
-  const scout = useCallback(async () => {
-    if (scouting) return;
-    setScouting(true);
-    setScoutError("");
-    setScoutSaid("");
+  // The same plumbing carries anything the user has heard themselves, typed
+  // straight into the card, because news that has to be walked to another tab
+  // mostly never arrives.
+  const askNova = useCallback(
+    async (ask) => {
+      if (scouting) return;
+      setScouting(true);
+      setScoutError("");
+      setScoutSaid("");
+      try {
+        const result = await sendChat([{ role: "user", content: ask }], chatContext);
+        setScoutSaid(result.reply || "Nothing new found.");
+        if (result.notes?.length) onNotes?.(result.notes);
+        else load();
+      } catch (e) {
+        setScoutError(String(e.message || e));
+      } finally {
+        setScouting(false);
+      }
+    },
+    [scouting, chatContext, onNotes, load]
+  );
+
+  const scout = useCallback(() => {
     const event = data?.nextEvent || nextEvent;
-    const ask =
+    return askNova(
       `Check the latest team news for gameweek ${event}, for my eleven and my bench, and for my opponent's ` +
-      "likely eleven. Search for injuries, suspensions, illness, expected line-ups and anything a manager has " +
-      "said this week. Record everything you find with record_intel so it reaches the projections. Then reply " +
-      "in at most three short lines, saying only what changes who I should start.";
-    try {
-      const result = await sendChat([{ role: "user", content: ask }], chatContext);
-      setScoutSaid(result.reply || "Nothing new found.");
-      if (result.notes?.length) onNotes?.(result.notes);
-      else load();
-    } catch (e) {
-      setScoutError(String(e.message || e));
-    } finally {
-      setScouting(false);
-    }
-  }, [scouting, data, nextEvent, chatContext, onNotes, load]);
+        "likely eleven. Search for injuries, suspensions, illness, expected line-ups and anything a manager has " +
+        "said this week. Record everything you find with record_intel so it reaches the projections. Then reply " +
+        "in at most three short lines, saying only what changes who I should start."
+    );
+  }, [askNova, data, nextEvent]);
+
+  const tell = useCallback(
+    (event) => {
+      event.preventDefault();
+      const heard = tip.trim();
+      if (!heard) return;
+      setTip("");
+      return askNova(
+        `${heard}\n\nI heard this myself. Record every factual claim in it with record_intel, one note per ` +
+          "player, then confirm in one line what changed. If a name is ambiguous, ask me which player."
+      );
+    },
+    [tip, askNova]
+  );
 
   // The runs shown here are the gameweeks ahead, not the opening six the draft
   // board uses, so they come from this response rather than the bootstrap.
@@ -278,6 +303,18 @@ export default function MyWeek({
             {scouting ? "Checking" : "Check the news"}
           </button>
         </div>
+        <form className="tell-nova" onSubmit={tell}>
+          <input
+            className="search"
+            placeholder="Heard something? Type it and Nova writes it down"
+            value={tip}
+            onChange={(e) => setTip(e.target.value)}
+            disabled={scouting}
+          />
+          <button className="chip" type="submit" disabled={scouting || !tip.trim()}>
+            Tell Nova
+          </button>
+        </form>
         {scoutError && <div className="banner error">Could not check the news: {scoutError}</div>}
         {scoutSaid && <p className="week-summary">{scoutSaid}</p>}
         {notes?.map((note) => (

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { fetchFreeAgents } from "../api.js";
+import { fetchFreeAgents, sendChat } from "../api.js";
 import FixtureRun from "./FixtureRun.jsx";
 import { deadlineLine } from "./MyWeek.jsx";
 
@@ -52,12 +52,17 @@ export default function FreeAgents({
   corrections,
   onLoaded,
   notes,
+  onNotes,
+  chatContext,
 }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [expanded, setExpanded] = useState(null);
   const [pos, setPos] = useState("ALL");
+  const [checking, setChecking] = useState(false);
+  const [checkSaid, setCheckSaid] = useState("");
+  const [checkError, setCheckError] = useState("");
 
   const mineKey = useMemo(() => myElements.slice().sort((a, b) => a - b).join(","), [myElements]);
   const ownedKey = useMemo(() => ownedElements.slice().sort((a, b) => a - b).join(","), [ownedElements]);
@@ -84,6 +89,47 @@ export default function FreeAgents({
   useEffect(load, [load]);
 
   const toggle = useCallback((id) => setExpanded((c) => (c === id ? null : id)), []);
+
+  // A claim built on stale minutes is worse than no claim, so before acting the
+  // names involved get checked: Nova verifies who actually starts, records what
+  // she finds, and the suggestions rebuild on the corrected numbers.
+  const checkNames = useCallback(async () => {
+    if (checking || !data) return;
+    const names = [
+      ...new Set([
+        ...(data.upgrades || []).flatMap((u) => [`${u.in.name} (${u.in.teamShort})`, `${u.out.name} (${u.out.teamShort})`]),
+        ...ORDER.flatMap((position) =>
+          (data.freeAgents?.[position] || []).slice(0, 2).map((p) => `${p.name} (${p.teamShort})`)
+        ),
+      ]),
+    ].slice(0, 12);
+    if (!names.length) return;
+    setChecking(true);
+    setCheckError("");
+    setCheckSaid("");
+    try {
+      const result = await sendChat(
+        [
+          {
+            role: "user",
+            content:
+              `Before I use a waiver claim, check the latest news on these players: ${names.join(", ")}. ` +
+              `For each, find whether they are expected to start in gameweek ${data.nextEvent}, and any injury, ` +
+              "suspension or transfer talk. Record everything factual with record_intel. Then reply in at most " +
+              "three short lines saying which of the suggested claims still make sense.",
+          },
+        ],
+        chatContext
+      );
+      setCheckSaid(result.reply || "Nothing new found.");
+      if (result.notes?.length) onNotes?.(result.notes);
+      else load();
+    } catch (e) {
+      setCheckError(String(e.message || e));
+    } finally {
+      setChecking(false);
+    }
+  }, [checking, data, chatContext, onNotes, load]);
   const runs = useMemo(() => {
     const map = {};
     for (const team of data?.fixtures?.teams || []) map[team.shortName] = team.run;
@@ -106,14 +152,27 @@ export default function FreeAgents({
                 : "Ranking the players nobody owns"}
           </p>
         </div>
-        <button className="chip subtle" onClick={load} disabled={loading}>
-          {loading ? "Updating" : "Refresh"}
-        </button>
+        <div className="controls head-controls">
+          <button className="chip active" onClick={checkNames} disabled={checking || loading || !data}>
+            {checking ? "Checking" : "Check these names"}
+          </button>
+          <button className="chip subtle" onClick={load} disabled={loading}>
+            {loading ? "Updating" : "Refresh"}
+          </button>
+        </div>
       </div>
 
       {data?.deadline && <p className="pmeta week-deadline">{deadlineLine(data.deadline)}</p>}
 
       {error && <div className="banner error">Could not load free agents: {error}</div>}
+      {checkError && <div className="banner error">Could not check the news: {checkError}</div>}
+      {checkSaid && <p className="week-summary">{checkSaid}</p>}
+      {data && (
+        <p className="pmeta">
+          These suggestions rest on playing-time history, which pre-season means last season's minutes. Check
+          the names before spending a claim, or tell Nova what a manager has said, and the numbers correct.
+        </p>
+      )}
       {data?.ownershipSource === "picks" && (
         <p className="pmeta">
           {leagueId

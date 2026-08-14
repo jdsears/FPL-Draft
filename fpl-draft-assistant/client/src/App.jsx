@@ -552,6 +552,8 @@ export default function App() {
             corrections={corrections}
             onLoaded={setAgents}
             notes={notes}
+            onNotes={onNotes}
+            chatContext={chatContext}
           />
         )}
         {tab === "trades" && (
