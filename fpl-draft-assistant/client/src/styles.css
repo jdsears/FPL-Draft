@@ -460,6 +460,12 @@ table.board { width: 100%; border-collapse: collapse; background: var(--panel); 
 .sos-row { cursor: default; }
 .sos-row.sos-hard { border-left: 3px solid var(--danger); }
 .sos-row.sos-easy { border-left: 3px solid var(--accent); }
+/* Trades: the gain to you, with what it costs them underneath */
+.week-points .trade-cost {
+  display: block; font-size: 12px; font-weight: 500; color: var(--muted);
+  white-space: nowrap;
+}
+.sos-row .week-main .pmeta { display: block; line-height: 1.5; }
 
 /* Banners */
 .banner {

@@ -14,10 +14,15 @@ gameweek it is.
   bench in the order it would come on, and warnings for anyone injured,
   suspended or without a fixture. When your league is connected it also shows
   the manager you are drawn against and a projected scoreline.
+- **Season**: the league table with every squad's projected strength beside it,
+  recent form, and your remaining run of opponents rated against the league
+  average, so you know whether the schedule is doing you a favour.
 - **Free agents**: every player nobody in the league owns, ranked on expected
   points a gameweek, with the same-position swaps worth claiming and why. Live
   ownership comes from your league when it is connected, so waiver moves by
   rivals are reflected.
+- **Trades**: every one-for-one swap with every rival, valued by re-picking both
+  elevens, so you can see what a deal is worth to you and what it costs them.
 - **Draft board**: every player ranked by value over replacement (VORP), with
   projected points, last season's totals, injury news and the opening six
   fixtures. Filter by position, search by name or club. Tap any player to see
@@ -86,7 +91,12 @@ questions typically costs pennies rather than pounds.
 4. Open **Free agents** before the waiver deadline. Anything under "Worth a
    claim" is a same-position swap that improves your squad by enough to be worth
    your waiver priority; if the list is empty, hold it.
-5. Ask **Nova** about a close call. She knows which gameweek is next and who you
+5. Look at **Trades** when you need something a rival has. The swaps marked in
+   green are the ones that barely cost them, which are the ones worth asking
+   for.
+6. Use **Season** to see whether you are actually behind or just have a hard
+   run of opponents left.
+7. Ask **Nova** about a close call. She knows which gameweek is next and who you
    are playing.
 
 ## How the weekly projection works
@@ -108,6 +118,29 @@ fixtures rather than gameweeks.
 The eleven itself comes from `lib/lineup.js`, which enumerates every legal
 formation the squad can fill and picks the highest-scoring one exactly. There is
 no captain in this league, so the eleven is the whole weekly decision.
+
+## How trades are valued
+
+Comparing the two players in a trade is the wrong way round, because only eleven
+of the fifteen score. A fifth midfielder who never starts is worth nothing to
+the manager holding him. So `lib/trades.js` values every swap by re-picking both
+elevens and comparing what they are expected to score.
+
+That leads somewhere worth knowing before you go negotiating. Squads must stay
+at 2 GKP, 5 DEF, 5 MID and 3 FWD, so a trade is position for position. Say we
+both leave one defender out: mine are a1 to a5 with a5 benched, theirs b1 to b5
+with b5 benched. For their spare to improve my eleven it has to beat my worst
+starter, so b5 > a4. For my spare to improve theirs, a5 > b4. Together those say
+b5 > a4 >= a5 > b4 >= b5, which cannot be true. **On one set of projections, no
+like-for-like trade improves both sides.** It is zero sum by construction, and
+the unit tests check that exhaustively rather than taking the algebra on trust.
+
+So the app does not pretend to find deals where everybody wins. It ranks swaps
+by what they are worth to you and says what each one costs the other manager.
+The ones that cost them almost nothing are the realistic asks, and they usually
+work because the player leaving their squad was not in their eleven anyway. Any
+deal beyond that needs them to value the player differently from you, which is a
+conversation rather than a calculation.
 
 ## Notes
 

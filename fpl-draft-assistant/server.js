@@ -17,6 +17,7 @@ import { buildSeasonProjections, buildBaseline, PLANNING_WINDOW } from "./lib/se
 import { pickLineup } from "./lib/lineup.js";
 import { buildWaiverBoard } from "./lib/waivers.js";
 import { buildSeasonOverview } from "./lib/league.js";
+import { suggestTrades } from "./lib/trades.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -308,6 +309,65 @@ app.post("/api/season-overview", async (req, res) => {
       nextEvent: projections.currentEvent + 1,
       window: projections.window,
       ...overview,
+    });
+  } catch (err) {
+    res.status(502).json({ error: String(err.message || err) });
+  }
+});
+
+/**
+ * Trades, against every rival at once, because the useful question is not
+ * "is this trade good" but "where in the league is there a deal". Each swap is
+ * valued by re-picking both elevens; see lib/trades.js for why that means a
+ * like-for-like trade cannot help both sides.
+ */
+app.post("/api/trades", async (req, res) => {
+  try {
+    const leagueId = req.body?.leagueId;
+    if (!leagueId) return res.status(400).json({ error: "leagueId required" });
+    const myEntryId = Number(req.body?.myEntryId) || null;
+
+    const details = await getLeagueDetails(leagueId);
+    const entries = details?.league_entries || [];
+    const ownership = await readOwnership(leagueId);
+
+    const { source, projections } = await projectSeason(req.body?.window);
+    const byId = new Map(projections.players.map((p) => [p.id, p]));
+    const squadOf = (elements) => (elements || []).map((id) => byId.get(id)).filter(Boolean);
+
+    const myElements = ownership.byEntry.get(myEntryId) || elementIds(req.body?.elements);
+    const mySquad = squadOf(myElements);
+
+    const rivals = [];
+    for (const entry of entries) {
+      if (entry.entry_id === myEntryId) continue;
+      const theirSquad = squadOf(ownership.byEntry.get(entry.entry_id));
+      if (!theirSquad.length) continue;
+      const result = suggestTrades(mySquad, theirSquad, { limit: 3 });
+      rivals.push({
+        entryId: entry.entry_id,
+        name: entry.entry_name || `${entry.player_first_name || ""} ${entry.player_last_name || ""}`.trim(),
+        manager: `${entry.player_first_name || ""} ${entry.player_last_name || ""}`.trim(),
+        ...result,
+      });
+    }
+    // The rival with the biggest gain on offer goes first.
+    const topGain = (rival) => (rival.best[0] ? rival.best[0].myGain : -Infinity);
+    rivals.sort((a, b) => topGain(b) - topGain(a));
+
+    res.json({
+      source,
+      leagueName: details?.league?.name || "",
+      tradesAllowed: (details?.league?.trades || "") !== "n",
+      squadSource: ownership.byEntry.has(myEntryId) ? "league" : "marks",
+      ownershipError: ownership.error,
+      currentEvent: projections.currentEvent,
+      nextEvent: projections.currentEvent + 1,
+      window: projections.window,
+      myEleven: rivals[0]?.myEleven ?? null,
+      myFormation: rivals[0]?.myFormation ?? "",
+      squadKnown: mySquad.length > 0,
+      rivals,
     });
   } catch (err) {
     res.status(502).json({ error: String(err.message || err) });

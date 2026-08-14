@@ -29,6 +29,9 @@ export const fetchFreeAgents = (body) => postJson("/api/free-agents", body);
 /** The league table, every squad's strength, and the run of opponents left. */
 export const fetchSeasonOverview = (body) => postJson("/api/season-overview", body);
 
+/** Every one-for-one swap with every rival, valued both ways. */
+export const fetchTrades = (body) => postJson("/api/trades", body);
+
 export async function sendChat(messages, context) {
   const res = await fetch("/api/chat", {
     method: "POST",

@@ -132,6 +132,13 @@ for (const width of WIDTHS) {
       },
     ],
     [
+      "trades",
+      async () => {
+        await page.getByRole("tab", { name: "Trades" }).click();
+        await page.waitForSelector(".week .card");
+      },
+    ],
+    [
       "board",
       async () => {
         await page.getByRole("tab", { name: "Draft board" }).click();

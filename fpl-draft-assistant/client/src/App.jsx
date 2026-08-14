@@ -11,6 +11,7 @@ import SyncStatus from "./components/SyncStatus.jsx";
 import MyWeek from "./components/MyWeek.jsx";
 import FreeAgents from "./components/FreeAgents.jsx";
 import SeasonView from "./components/SeasonView.jsx";
+import Trades from "./components/Trades.jsx";
 
 const SQUAD_LIMITS = { GKP: 2, DEF: 5, MID: 5, FWD: 3 };
 const POLL_MS = 10000;
@@ -288,6 +289,7 @@ export default function App() {
           ["week", "My week"],
           ["season", "Season"],
           ["agents", "Free agents"],
+          ["trades", "Trades"],
           ["board", "Draft board"],
           ["best", "Best available"],
           ["fixtures", "Fixtures"],
@@ -346,6 +348,9 @@ export default function App() {
             myElements={myElements}
             ownedElements={ownedElements}
           />
+        )}
+        {tab === "trades" && (
+          <Trades leagueId={leagueId} myEntryId={myEntryId} myElements={myElements} />
         )}
         {tab === "board" && (
           <DraftBoard
