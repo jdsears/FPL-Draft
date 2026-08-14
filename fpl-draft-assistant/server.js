@@ -15,6 +15,7 @@ import { buildRankings } from "./lib/rankings.js";
 import { buildFixtureContext } from "./lib/fixtures.js";
 import { buildSeasonProjections, buildBaseline, PLANNING_WINDOW } from "./lib/season.js";
 import { pickLineup } from "./lib/lineup.js";
+import { buildWaiverBoard } from "./lib/waivers.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -124,6 +125,64 @@ app.post("/api/my-week", async (req, res) => {
       // squad can legitimately come back short of what was asked for.
       unknown: mine.size - mySquad.length,
       opponent: theirs.size ? pickLineup(theirSquad) : null,
+    });
+  } catch (err) {
+    res.status(500).json({ error: String(err.message || err) });
+  }
+});
+
+/**
+ * Free agents and the claims worth making. Ownership comes from the league's
+ * element-status feed when it answers, because that is the only source that
+ * knows about waiver moves since the draft. If it does not, the client's own
+ * view of who was drafted stands in, and the response says which was used.
+ */
+app.post("/api/free-agents", async (req, res) => {
+  const ids = (value) => (Array.isArray(value) ? value.map(Number).filter((n) => Number.isFinite(n)) : []);
+  try {
+    const leagueId = req.body?.leagueId;
+    let owned = null;
+    let ownershipSource = "picks";
+    let ownershipError = "";
+    let pendingClaims = 0;
+
+    if (leagueId) {
+      try {
+        const rows = (await getElementStatus(leagueId))?.element_status || [];
+        if (rows.length) {
+          owned = new Set();
+          for (const row of rows) {
+            const element = Number(row.element);
+            const unowned = row.owner === null || row.owner === undefined;
+            // A player under a pending claim is not really available.
+            const free = unowned && (row.status === undefined || String(row.status).toLowerCase() === "a");
+            if (!free) owned.add(element);
+            if (unowned && !free) pendingClaims += 1;
+          }
+          ownershipSource = "league";
+        }
+      } catch (err) {
+        ownershipError = String(err.message || err);
+      }
+    }
+    if (!owned) owned = new Set(ids(req.body?.ownedElements));
+
+    const mine = new Set(ids(req.body?.elements));
+    const { source, fixturesSource, fixtureContext, projections } = await projectSeason(req.body?.window);
+    const board = buildWaiverBoard(projections.players, { owned, mine });
+
+    res.json({
+      source,
+      fixturesSource,
+      fixtures: fixtureContext,
+      ownershipSource,
+      ownershipError,
+      pendingClaims,
+      currentEvent: projections.currentEvent,
+      nextEvent: projections.currentEvent + 1,
+      window: projections.window,
+      fixturesAvailable: projections.fixturesAvailable,
+      ...board,
     });
   } catch (err) {
     res.status(500).json({ error: String(err.message || err) });

@@ -439,6 +439,7 @@ table.board { width: 100%; border-collapse: collapse; background: var(--panel); 
 .week-tag-unavailable, .week-tag-suspended, .week-tag-short {
   background: rgba(255, 107, 129, 0.14); color: var(--danger);
 }
+.week-tag-gain { background: rgba(0, 255, 135, 0.12); color: var(--accent); }
 
 /* Banners */
 .banner {

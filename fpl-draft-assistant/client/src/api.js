@@ -24,6 +24,9 @@ async function postJson(url, body) {
 export const fetchMyWeek = (elements, opponentElements) =>
   postJson("/api/my-week", { elements, opponentElements });
 
+/** Unowned players ranked for the gameweeks ahead, plus the swaps worth making. */
+export const fetchFreeAgents = (body) => postJson("/api/free-agents", body);
+
 export async function sendChat(messages, context) {
   const res = await fetch("/api/chat", {
     method: "POST",

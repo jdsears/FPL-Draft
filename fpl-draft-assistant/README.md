@@ -14,6 +14,10 @@ gameweek it is.
   bench in the order it would come on, and warnings for anyone injured,
   suspended or without a fixture. When your league is connected it also shows
   the manager you are drawn against and a projected scoreline.
+- **Free agents**: every player nobody in the league owns, ranked on expected
+  points a gameweek, with the same-position swaps worth claiming and why. Live
+  ownership comes from your league when it is connected, so waiver moves by
+  rivals are reflected.
 - **Draft board**: every player ranked by value over replacement (VORP), with
   projected points, last season's totals, injury news and the opening six
   fixtures. Filter by position, search by name or club. Tap any player to see
@@ -79,7 +83,10 @@ questions typically costs pennies rather than pounds.
    Their squad is read from the draft, so waiver moves since are not reflected.
 3. Check the warnings before you confirm. Anyone injured, suspended or facing a
    blank gameweek is listed by name.
-4. Ask **Nova** about a close call. She knows which gameweek is next and who you
+4. Open **Free agents** before the waiver deadline. Anything under "Worth a
+   claim" is a same-position swap that improves your squad by enough to be worth
+   your waiver priority; if the list is empty, hold it.
+5. Ask **Nova** about a close call. She knows which gameweek is next and who you
    are playing.
 
 ## How the weekly projection works

@@ -16,7 +16,7 @@ function ago(ms) {
   return minutes === 1 ? "1 minute ago" : `${minutes} minutes ago`;
 }
 
-export default function SyncStatus({ syncedAt, error, picks, onSyncNow }) {
+export default function SyncStatus({ syncedAt, error, picks, onSyncNow, inSeason = false }) {
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
@@ -26,19 +26,26 @@ export default function SyncStatus({ syncedAt, error, picks, onSyncNow }) {
 
   const stale = syncedAt !== null && now - syncedAt > STALE_AFTER_MS;
   const failing = Boolean(error) || stale;
+  // Once the draft is over the pick count is history, and the sync is really
+  // about whether the league data behind every tab is current.
   const picksLabel = `${picks} ${picks === 1 ? "pick" : "picks"} made`;
+  const subject = inSeason ? "League data" : "Picks";
 
   // The raw error is a URL-bearing string that reads badly and cannot wrap, so
   // it goes in the tooltip and the bar carries plain English.
   let message;
   if (!syncedAt && !error) {
-    message = "Connecting to your draft, waiting for the first update";
+    message = inSeason ? "Connecting to your league" : "Connecting to your draft, waiting for the first update";
   } else if (!syncedAt) {
-    message = "Not syncing, picks are not arriving. Mark them by hand with Mine and Gone";
+    message = inSeason
+      ? "Not syncing, so your squad and free agents may be out of date"
+      : "Not syncing, picks are not arriving. Mark them by hand with Mine and Gone";
   } else if (failing) {
-    message = `Picks may have stopped arriving, last update ${ago(now - syncedAt)}. ${picksLabel}`;
+    message = `${subject} may have stopped updating, last update ${ago(now - syncedAt)}`;
+    if (!inSeason) message += `. ${picksLabel}`;
   } else {
-    message = `Picks in sync, updated ${ago(now - syncedAt)}. ${picksLabel}`;
+    message = `${subject} in sync, updated ${ago(now - syncedAt)}`;
+    if (!inSeason) message += `. ${picksLabel}`;
   }
 
   return (

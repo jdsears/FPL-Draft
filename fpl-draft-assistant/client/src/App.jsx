@@ -9,6 +9,7 @@ import FixturesTab from "./components/FixturesTab.jsx";
 import CheatSheet from "./components/CheatSheet.jsx";
 import SyncStatus from "./components/SyncStatus.jsx";
 import MyWeek from "./components/MyWeek.jsx";
+import FreeAgents from "./components/FreeAgents.jsx";
 
 const SQUAD_LIMITS = { GKP: 2, DEF: 5, MID: 5, FWD: 3 };
 const POLL_MS = 10000;
@@ -171,6 +172,12 @@ export default function App() {
     [players, draftedBy]
   );
   const myElements = useMemo(() => myRoster.map((p) => p.id), [myRoster]);
+  // Everything anyone has taken, which is the fallback when the league's own
+  // ownership feed cannot be read.
+  const ownedElements = useMemo(
+    () => Object.keys(draftedBy).map(Number).filter(Number.isFinite),
+    [draftedBy]
+  );
 
   // ---- Head to head ----
   // Rival squads come from the draft picks, which is what the app can see
@@ -273,6 +280,7 @@ export default function App() {
       <nav className="tabs" role="tablist">
         {[
           ["week", "My week"],
+          ["agents", "Free agents"],
           ["board", "Draft board"],
           ["best", "Best available"],
           ["fixtures", "Fixtures"],
@@ -294,7 +302,13 @@ export default function App() {
       </nav>
 
       {leagueId && league && (
-        <SyncStatus syncedAt={sync.at} error={sync.error} picks={sync.picks} onSyncNow={syncNow} />
+        <SyncStatus
+          syncedAt={sync.at}
+          error={sync.error}
+          picks={sync.picks}
+          onSyncNow={syncNow}
+          inSeason={currentEvent > 0}
+        />
       )}
 
       {loadError && <div className="banner error">Could not load player data: {loadError}</div>}
@@ -308,6 +322,9 @@ export default function App() {
             nextEvent={nextEvent}
             leagueConnected={Boolean(league)}
           />
+        )}
+        {tab === "agents" && (
+          <FreeAgents leagueId={leagueId} myElements={myElements} ownedElements={ownedElements} />
         )}
         {tab === "board" && (
           <DraftBoard
