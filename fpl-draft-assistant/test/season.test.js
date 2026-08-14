@@ -199,6 +199,22 @@ test("a pre-season baseline lifts an early-season projection towards last season
   );
 });
 
+test("a thin prior counts for almost nothing", () => {
+  const elements = [element({ code: 700, total_points: 2, points_per_game: "2.0", starts: 1, form: "0.0" })];
+  const withPrior = (appearances) =>
+    buildSeasonProjections(bootstrap(elements, { current: 1 }), {
+      fixtureContext: contextFor(2, 5),
+      currentEvent: 1,
+      baseline: { 700: { pointsPerGame: 7, appearances } },
+    }).players[0].season;
+
+  const cameo = withPrior(1);
+  const regular = withPrior(36);
+  assert.ok(cameo.weights.prior < SEASON_WEIGHTS.prior / 5, "one appearance is barely evidence");
+  assert.equal(regular.weights.prior, SEASON_WEIGHTS.prior, "a full season earns the full weight");
+  assert.ok(regular.perFixture > cameo.perFixture, "the same rate counts for more with more football behind it");
+});
+
 test("flagged players are marked down and departed players are gone", () => {
   const result = buildSeasonProjections(
     bootstrap([

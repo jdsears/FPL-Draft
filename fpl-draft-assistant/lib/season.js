@@ -137,7 +137,12 @@ export function buildSeasonProjections(bootstrap, options = {}) {
     const prior = baseline?.[e.code] || null;
     const weights = { rate: ppg > 0 ? SEASON_WEIGHTS.rate : 0, form: 0, prior: 0 };
     if (!preSeason && currentEvent >= FORM_MIN_GAMEWEEKS && form > 0) weights.form = SEASON_WEIGHTS.form;
-    if (prior && Number(prior.pointsPerGame) > 0) weights.prior = SEASON_WEIGHTS.prior;
+    if (prior && Number(prior.pointsPerGame) > 0) {
+      // A rate built on one cameo is not a season's evidence: the prior earns
+      // its full weight at ten appearances and almost none below two, so a
+      // player who scored 7 in his only game does not carry that all autumn.
+      weights.prior = SEASON_WEIGHTS.prior * clamp((Number(prior.appearances) || 0) / 10, 0, 1);
+    }
 
     const totalWeight = weights.rate + weights.form + weights.prior;
     const perFixture =
