@@ -43,5 +43,11 @@ export async function sendChat(messages, context) {
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || `Chat failed (${res.status})`);
-  return { reply: data.reply, sources: Array.isArray(data.sources) ? data.sources : [] };
+  return {
+    reply: data.reply,
+    sources: Array.isArray(data.sources) ? data.sources : [],
+    // Team news Nova recorded during the turn, for the caller to store.
+    notes: Array.isArray(data.notes) ? data.notes : [],
+    rejected: Array.isArray(data.rejected) ? data.rejected : [],
+  };
 }

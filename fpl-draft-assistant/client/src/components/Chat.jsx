@@ -2,12 +2,20 @@ import React, { useEffect, useRef, useState } from "react";
 import { sendChat } from "../api.js";
 import Avatar from "./Avatar.jsx";
 
-const SUGGESTIONS = [
+const DRAFT_SUGGESTIONS = [
   "Who should I take with my next pick?",
   "Any transfer or injury news I should know before drafting?",
   "Best strategy for a 10-team snake draft?",
   "When should I draft my goalkeepers?",
   "Rate my team so far",
+];
+
+const SEASON_SUGGESTIONS = [
+  "Check the team news for my eleven",
+  "Would you change my line-up this week?",
+  "Is there anyone worth claiming?",
+  "How do I beat my opponent this week?",
+  "Who is a risk to be rotated?",
 ];
 
 function sourceLabel(source) {
@@ -17,6 +25,30 @@ function sourceLabel(source) {
   } catch {
     return source.url;
   }
+}
+
+/**
+ * Team news Nova recorded during a turn. Shown so it is obvious that something
+ * changed rather than just being said, since these adjust the projections.
+ */
+function Recorded({ notes, rejected }) {
+  if (!notes?.length && !rejected?.length) return null;
+  return (
+    <div className="recorded">
+      {notes?.map((note) => (
+        <span key={note.id} className="recorded-note">
+          <span className={`pos pos-${note.position}`}>{note.position}</span>
+          <b>{note.playerName}</b> {note.label.toLowerCase()}
+          <span className="pmeta"> noted, projections updated</span>
+        </span>
+      ))}
+      {rejected?.map((r, i) => (
+        <span key={`r-${i}`} className="recorded-note recorded-failed">
+          {r.error}
+        </span>
+      ))}
+    </div>
+  );
 }
 
 /** Citations from Nova's web searches, shown under her reply. */
@@ -34,7 +66,7 @@ function Sources({ sources }) {
   );
 }
 
-export default function Chat({ context }) {
+export default function Chat({ context, onNotes }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
@@ -54,8 +86,10 @@ export default function Chat({ context }) {
     setMessages(next);
     setBusy(true);
     try {
-      const { reply, sources } = await sendChat(next, context);
-      setMessages((m) => [...m, { role: "assistant", content: reply, sources }]);
+      const { reply, sources, notes, rejected } = await sendChat(next, context);
+      setMessages((m) => [...m, { role: "assistant", content: reply, sources, notes, rejected }]);
+      // Anything she recorded has to reach the store, or it changes nothing.
+      if (notes?.length) onNotes?.(notes);
     } catch (e) {
       setError(String(e.message || e));
       setMessages(messages);
@@ -71,18 +105,21 @@ export default function Chat({ context }) {
         <Avatar size={44} />
         <div>
           <div className="pname">Nova</div>
-          <div className="pmeta">Your draft-day strategist</div>
+          <div className="pmeta">
+            {context?.gameweek ? `Your gameweek ${context.gameweek} strategist` : "Your draft-day strategist"}
+          </div>
         </div>
       </div>
       <div className="chat-log">
         {messages.length === 0 && (
           <div className="chat-empty">
             <p>
-              Ask Nova about picks, strategy, or your squad. She can see the current best
-              available players, your roster, and recent picks.
+              {context?.gameweek
+                ? "Ask Nova about this week. She can see the eleven the app picked, your opponent, and the claims it rates, and she will go and check the team news herself. Tell her anything you have heard and she will write it down, which changes the projections."
+                : "Ask Nova about picks, strategy, or your squad. She can see the current best available players, your roster, and recent picks."}
             </p>
             <div className="suggestions">
-              {SUGGESTIONS.map((s) => (
+              {(context?.gameweek ? SEASON_SUGGESTIONS : DRAFT_SUGGESTIONS).map((s) => (
                 <button key={s} className="chip" onClick={() => send(s)}>
                   {s}
                 </button>
@@ -96,6 +133,7 @@ export default function Chat({ context }) {
               {m.role === "assistant" && <Avatar size={28} />}
               <div className={`msg ${m.role}`}>{m.content}</div>
             </div>
+            {m.role === "assistant" && <Recorded notes={m.notes} rejected={m.rejected} />}
             {m.role === "assistant" && <Sources sources={m.sources} />}
           </React.Fragment>
         ))}

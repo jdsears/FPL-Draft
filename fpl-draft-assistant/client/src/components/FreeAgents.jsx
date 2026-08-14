@@ -51,6 +51,7 @@ export default function FreeAgents({
   ownedElements,
   corrections,
   onLoaded,
+  notes,
 }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
@@ -70,6 +71,7 @@ export default function FreeAgents({
       elements: mineKey ? mineKey.split(",").map(Number) : [],
       ownedElements: ownedKey ? ownedKey.split(",").map(Number) : [],
       corrections,
+      notes,
     })
       .then((d) => {
         setData(d);
@@ -77,7 +79,7 @@ export default function FreeAgents({
       })
       .catch((e) => setError(String(e.message || e)))
       .finally(() => setLoading(false));
-  }, [leagueId, myEntryId, mineKey, ownedKey, corrections, onLoaded]);
+  }, [leagueId, myEntryId, mineKey, ownedKey, corrections, onLoaded, notes]);
 
   useEffect(load, [load]);
 

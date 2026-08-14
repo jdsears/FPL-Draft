@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { fetchMyWeek } from "../api.js";
+import { fetchMyWeek, sendChat } from "../api.js";
 import FixtureRun from "./FixtureRun.jsx";
 
 // The weekly decision. Captains are disabled in this league, so the only lever
@@ -118,12 +118,19 @@ export default function MyWeek({
   myEntryId,
   corrections,
   onLoaded,
+  notes,
+  onNotes,
+  onForgetNote,
+  chatContext,
 }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [expanded, setExpanded] = useState(null);
   const [showOpponent, setShowOpponent] = useState(false);
+  const [scouting, setScouting] = useState(false);
+  const [scoutSaid, setScoutSaid] = useState("");
+  const [scoutError, setScoutError] = useState("");
 
   // Stable primitive keys so the fetch does not re-run on every render of the
   // parent, which re-derives these arrays each time picks are polled.
@@ -149,6 +156,7 @@ export default function MyWeek({
       elements: mineKey ? mineKey.split(",").map(Number) : [],
       opponentElements: theirsKey ? theirsKey.split(",").map(Number) : [],
       corrections,
+      notes,
     })
       .then((d) => {
         setData(d);
@@ -158,11 +166,36 @@ export default function MyWeek({
       })
       .catch((e) => setError(String(e.message || e)))
       .finally(() => setLoading(false));
-  }, [mineKey, theirsKey, leagueId, myEntryId, opponent, corrections, onLoaded]);
+  }, [mineKey, theirsKey, leagueId, myEntryId, opponent, corrections, onLoaded, notes]);
 
   useEffect(load, [load]);
 
   const toggle = useCallback((id) => setExpanded((c) => (c === id ? null : id)), []);
+
+  // Checking the team news is Nova's job, not the user's. She searches, records
+  // what she finds, and the recorded notes feed straight back into the eleven.
+  const scout = useCallback(async () => {
+    if (scouting) return;
+    setScouting(true);
+    setScoutError("");
+    setScoutSaid("");
+    const event = data?.nextEvent || nextEvent;
+    const ask =
+      `Check the latest team news for gameweek ${event}, for my eleven and my bench, and for my opponent's ` +
+      "likely eleven. Search for injuries, suspensions, illness, expected line-ups and anything a manager has " +
+      "said this week. Record everything you find with record_intel so it reaches the projections. Then reply " +
+      "in at most three short lines, saying only what changes who I should start.";
+    try {
+      const result = await sendChat([{ role: "user", content: ask }], chatContext);
+      setScoutSaid(result.reply || "Nothing new found.");
+      if (result.notes?.length) onNotes?.(result.notes);
+      else load();
+    } catch (e) {
+      setScoutError(String(e.message || e));
+    } finally {
+      setScouting(false);
+    }
+  }, [scouting, data, nextEvent, chatContext, onNotes, load]);
 
   // The runs shown here are the gameweeks ahead, not the opening six the draft
   // board uses, so they come from this response rather than the bootstrap.
@@ -247,6 +280,51 @@ export default function MyWeek({
             : "Connect your league on the League tab to see who you play and how your eleven compares."}
         </p>
       )}
+
+      <div className="card week-news">
+        <div className="week-head">
+          <div>
+            <h3>Team news</h3>
+            <p className="pmeta">
+              {notes?.length
+                ? `${notes.length} note${notes.length === 1 ? "" : "s"} on file, already in the numbers below.`
+                : "Nothing on file. Nova can go and look, or tell her anything you have heard."}
+            </p>
+          </div>
+          <button className="chip active" onClick={scout} disabled={scouting}>
+            {scouting ? "Checking" : "Check the news"}
+          </button>
+        </div>
+        {scoutError && <div className="banner error">Could not check the news: {scoutError}</div>}
+        {scoutSaid && <p className="week-summary">{scoutSaid}</p>}
+        {notes?.map((note) => (
+          <div key={note.id} className={`week-row sos-row ${note.kind === "out" || note.kind === "suspended" ? "sos-hard" : ""}`.trim()}>
+            <span className="week-main">
+              <span className="pname">
+                <span className={`pos pos-${note.position}`}>{note.position}</span> {note.playerName}
+                <span className="pmeta"> {note.teamShort}</span>
+              </span>
+              <span className="pmeta">
+                {note.label}
+                {note.detail ? `: ${note.detail}` : ""} · {note.confidence} confidence ·{" "}
+                {note.source === "search" ? "Nova found this" : "you said this"}
+                {note.sourceUrl ? (
+                  <>
+                    {" "}
+                    <a href={note.sourceUrl} target="_blank" rel="noreferrer noopener">
+                      source
+                    </a>
+                  </>
+                ) : null}
+                {" "}· until gameweek {note.expiresAfterEvent}
+              </span>
+            </span>
+            <button className="mark gone" onClick={() => onForgetNote?.(note.id)} title="Forget this note">
+              ×
+            </button>
+          </div>
+        ))}
+      </div>
 
       {warnings.length > 0 && (
         <div className="card week-warnings">

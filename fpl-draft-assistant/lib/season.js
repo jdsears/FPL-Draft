@@ -88,6 +88,8 @@ function describe(player) {
   }
 
   if (b.availabilityFactor < 1) parts.push("carrying a flag, so check the news");
+  if (b.intelFactor < 1) parts.push("marked down on team news");
+  else if (b.intelFactor > 1) parts.push("marked up on team news");
 
   return `Expected ${round1(b.perGameweek)} a gameweek: ${parts.join(", ")}.`;
 }
@@ -104,12 +106,15 @@ function describe(player) {
  *                   pre-season snapshot, used as an early-season prior
  *   corrections     optional { GKP, DEF, MID, FWD } multipliers learned from how
  *                   past projections actually turned out (see lib/learning.js)
+ *   intel           optional { [elementId]: { factor, notes } } from dated team
+ *                   news the numbers cannot see (see lib/intel.js)
  */
 export function buildSeasonProjections(bootstrap, options = {}) {
   const window = options.window || PLANNING_WINDOW;
   const currentEvent = Math.max(0, Number(options.currentEvent) || 0);
   const baseline = options.baseline || null;
   const corrections = options.corrections || null;
+  const intel = options.intel || null;
   const fixtureTeams = options.fixtureContext?.teams || [];
   const fixturesAvailable = fixtureTeams.length > 0;
   const fixtureIndex = fixturesAvailable ? indexFixtureTeams(fixtureTeams) : null;
@@ -154,7 +159,12 @@ export function buildSeasonProjections(bootstrap, options = {}) {
     const fixtureFactor = seasonFixtureFactor(fixtureAverage);
     const availability = availabilityFactor(e.status, e.chance_of_playing_this_round, e.news);
 
-    const perPlayedFixture = perFixture * fixtureFactor * availability * correction;
+    // Team news the model cannot read: a doubt, a suspension, a manager saying
+    // somebody is rested. Bounded, so it tilts a decision rather than making it.
+    const news = intel?.[e.id] || null;
+    const newsFactor = Number(news?.factor) || 1;
+
+    const perPlayedFixture = perFixture * fixtureFactor * availability * correction * newsFactor;
     const windowPoints = perPlayedFixture * playProbability * fixtures;
 
     const player = {
@@ -171,6 +181,7 @@ export function buildSeasonProjections(bootstrap, options = {}) {
       chanceOfPlaying: e.chance_of_playing_this_round ?? null,
       news: e.news || "",
       fixtureTeam: fixtureTeam ? fixtureTeam.shortName : null,
+      notes: news?.notes || [],
       season: {
         perFixture: round2(perFixture),
         perGameweek: round2(windowPoints / window),
@@ -187,6 +198,7 @@ export function buildSeasonProjections(bootstrap, options = {}) {
         weights,
         preSeason,
         correction: round2(correction),
+        intelFactor: round2(newsFactor),
         summary: "",
       },
     };

@@ -20,6 +20,7 @@ import { buildWaiverBoard } from "./lib/waivers.js";
 import { buildSeasonOverview } from "./lib/league.js";
 import { suggestTrades } from "./lib/trades.js";
 import { buildLearning, correctionsFrom, normaliseCorrections } from "./lib/learning.js";
+import { buildAdjustments, buildNote, pruneNotes, INTEL_KINDS, describeNote } from "./lib/intel.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -64,31 +65,37 @@ app.get("/api/bootstrap", async (_req, res) => {
  * board's valuation. Used by the season list and the weekly lineup alike so
  * both always speak about players in the same numbers.
  */
-async function projectSeason(windowRequest, corrections = null) {
-  const window = Math.min(Math.max(Number(windowRequest) || PLANNING_WINDOW, 1), 10);
+async function projectSeason(options = {}) {
+  const window = Math.min(Math.max(Number(options.window) || PLANNING_WINDOW, 1), 10);
   const { data, source } = await getBootstrap();
   if (source === "live") captureBaseline(data, buildBaseline);
 
   const currentEvent = Number(data?.events?.current) || 0;
+  const nextEvent = currentEvent + 1;
   const main = await getMainGameData({ allowSample: source === "sample" });
   const fixtureContext = buildFixtureContext(main.teams, main.fixtures, {
-    firstEvent: currentEvent + 1,
+    firstEvent: nextEvent,
     gameweeks: window,
   });
 
+  // Notes come from the client, which is where they are stored, so they are
+  // rebuilt into adjustments here rather than trusted as numbers.
+  const notes = pruneNotes(Array.isArray(options.notes) ? options.notes : [], nextEvent);
   const projections = buildSeasonProjections(data, {
     fixtureContext,
     currentEvent,
     window,
     baseline: readBaseline()?.players || null,
-    corrections: normaliseCorrections(corrections),
+    corrections: normaliseCorrections(options.corrections),
+    intel: buildAdjustments(notes, nextEvent),
   });
   return {
     source,
     fixturesSource: main.source,
     fixtureContext,
     projections,
-    deadline: nextDeadline(main.events, currentEvent + 1),
+    liveNotes: notes.length,
+    deadline: nextDeadline(main.events, nextEvent),
   };
 }
 
@@ -106,7 +113,7 @@ function nextDeadline(events, event) {
 
 app.get("/api/season", async (req, res) => {
   try {
-    const { source, fixturesSource, fixtureContext, projections, deadline } = await projectSeason(req.query.window);
+    const { source, fixturesSource, fixtureContext, projections, deadline } = await projectSeason({ window: req.query.window });
     res.json({ source, fixturesSource, fixtures: fixtureContext, deadline, ...projections });
   } catch (err) {
     res.status(500).json({ error: String(err.message || err) });
@@ -131,10 +138,14 @@ app.post("/api/my-week", async (req, res) => {
 
     const me = squadOf(req.body?.myEntryId, req.body?.elements);
     const them = squadOf(req.body?.opponentEntryId, req.body?.opponentElements);
-    const { source, fixturesSource, fixtureContext, projections, deadline } = await projectSeason(
-      req.body?.window,
-      req.body?.corrections
-    );
+    // The weekly decision is about one gameweek, so it is projected over one.
+    // A five-week average would shrug off a one-match suspension, which is
+    // exactly the kind of thing that should decide who starts.
+    const { source, fixturesSource, fixtureContext, projections, deadline, liveNotes } = await projectSeason({
+      window: req.body?.window || 1,
+      corrections: req.body?.corrections,
+      notes: req.body?.notes,
+    });
 
     const squadFor = (set) => projections.players.filter((p) => set.has(p.id));
     const mySquad = squadFor(me.elements);
@@ -148,6 +159,7 @@ app.post("/api/my-week", async (req, res) => {
       ownershipError: ownership.error,
       deadline,
       corrections: projections.corrections,
+      liveNotes,
       currentEvent: projections.currentEvent,
       nextEvent: projections.currentEvent + 1,
       window: projections.window,
@@ -240,10 +252,11 @@ app.post("/api/free-agents", async (req, res) => {
     const owned = ownership.source === "league" ? ownership.owned : new Set(elementIds(req.body?.ownedElements));
     const mine = new Set(fromFeed || elementIds(req.body?.elements));
 
-    const { source, fixturesSource, fixtureContext, projections, deadline } = await projectSeason(
-      req.body?.window,
-      req.body?.corrections
-    );
+    const { source, fixturesSource, fixtureContext, projections, deadline, liveNotes } = await projectSeason({
+      window: req.body?.window,
+      corrections: req.body?.corrections,
+      notes: req.body?.notes,
+    });
     const board = buildWaiverBoard(projections.players, { owned, mine });
 
     res.json({
@@ -305,7 +318,11 @@ app.post("/api/season-overview", async (req, res) => {
       if (squads.size) ownershipSource = "picks";
     }
 
-    const { source, projections } = await projectSeason(req.body?.window, req.body?.corrections);
+    const { source, projections } = await projectSeason({
+      window: req.body?.window,
+      corrections: req.body?.corrections,
+      notes: req.body?.notes,
+    });
     const byId = new Map(projections.players.map((p) => [p.id, p]));
     const strengths = {};
     for (const [owner, elements] of squads) {
@@ -362,7 +379,11 @@ app.post("/api/trades", async (req, res) => {
     const entries = details?.league_entries || [];
     const ownership = await readOwnership(leagueId);
 
-    const { source, projections } = await projectSeason(req.body?.window, req.body?.corrections);
+    const { source, projections } = await projectSeason({
+      window: req.body?.window,
+      corrections: req.body?.corrections,
+      notes: req.body?.notes,
+    });
     const byId = new Map(projections.players.map((p) => [p.id, p]));
     const squadOf = (elements) => (elements || []).map((id) => byId.get(id)).filter(Boolean);
 
@@ -627,7 +648,7 @@ function collectSources(content) {
   return sources.slice(0, 8);
 }
 
-function buildSystemPrompt(context, { webSearch = false } = {}) {
+function buildSystemPrompt(context, { webSearch = false, notes = [] } = {}) {
   // The same assistant serves two very different jobs: a one-off draft, and
   // then a season of weekly decisions. Advice framed around picking players is
   // useless once the squads are settled, so the framing follows the gameweek.
@@ -645,7 +666,10 @@ function buildSystemPrompt(context, { webSearch = false } = {}) {
       `The draft is long finished and the season is under way. Gameweek ${gameweek} is next. Every question is about managing a settled squad, not about drafting.`,
       "The levers available each week: which eleven of the fifteen to start (there is no captain in this league, so the eleven is the whole decision), claiming free agents or waivers, and proposing trades with rival managers. Head-to-head results decide the league, so beating one specific opponent this week can matter more than maximising points in the abstract.",
       "In-season principles: minutes are worth more than reputation, because a benched star scores nothing; a short run of fixtures swings a week far more than a season average does; do not chase one big score from a player who does not start; a free agent who plays every week beats a squad player with a better name; when trading, value the rest of the season for both sides and be honest about which side wins.",
-      `Today's date is ${todayInWords()}. Team news moves fast, so injuries, suspensions, rotation and predicted line-ups for gameweek ${gameweek} matter more than anything historical.`
+      `Today's date is ${todayInWords()}. Team news moves fast, so injuries, suspensions, rotation and predicted line-ups for gameweek ${gameweek} matter more than anything historical.`,
+      "Finding that news is your job, not the user's. The app can read history, fixtures and form; it cannot read a press conference. So when a question turns on whether somebody will play, go and look rather than hedging, and say what you found.",
+      "You have a record_intel tool. Use it whenever you learn something the app's numbers cannot see, whether the user told you or you read it. That is what makes the difference stick: a recorded note adjusts the player's projection and can change the eleven the app recommends, whereas anything you only say in chat is forgotten. Record it, then tell the user in one line what it changed. If the tool comes back saying a name is ambiguous, ask which player rather than guessing.",
+      "Be careful what you record. A note is a claim about fact, not a view: record that a manager said somebody is out, not that you think somebody is due a goal. Prefer high confidence only for a manager's own words or a confirmed line-up."
     );
   } else {
     lines.push(
@@ -703,6 +727,15 @@ function buildSystemPrompt(context, { webSearch = false } = {}) {
     );
   }
   if (context?.deadline) lines.push(`The gameweek ${gameweek} deadline is ${context.deadline}.`);
+  if (notes?.length) {
+    lines.push(
+      "Notes already on file, which are already reflected in the projections above. Do not record these again, but do update them if you learn something newer:\n" +
+        notes
+          .slice(0, 40)
+          .map((n) => `- ${n.playerName} (${n.teamShort}): ${n.label}${n.detail ? `, ${n.detail}` : ""} [${n.confidence} confidence, from ${n.source === "search" ? "your search" : "the user"}, gameweek ${n.event}]`)
+          .join("\n")
+    );
+  }
   if (context?.learning?.length) {
     lines.push(
       "How the app's own projections have actually performed so far, which you should take into account and can quote:\n" +
@@ -729,6 +762,97 @@ function buildSystemPrompt(context, { webSearch = false } = {}) {
   return lines.join("\n\n");
 }
 
+/**
+ * Nova's note-taking tool. She calls this when she learns something the numbers
+ * cannot see, whether the user told her or she read it. The note is validated
+ * here, not taken on trust: an unknown player or an unknown kind comes back as
+ * an error she can act on, usually by asking which player was meant.
+ */
+const INTEL_TOOL = {
+  name: "record_intel",
+  description:
+    "Record one dated piece of team news about one player, so that it adjusts that player's projection and " +
+    "the eleven the app recommends. Use it whenever the user tells you something about a player's fitness, " +
+    "availability, expected selection or role, and whenever you find such a thing by searching. One call per " +
+    "player. Do not use it for opinions, for things already in the app's own data, or to repeat a note that is " +
+    "already listed as recorded.",
+  input_schema: {
+    type: "object",
+    properties: {
+      player: {
+        type: "string",
+        description: "The player's name as commonly written, e.g. Isak, M.Salah, Alexander-Arnold.",
+      },
+      team: {
+        type: "string",
+        description: "The player's club, only needed if the name alone could mean two players.",
+      },
+      kind: {
+        type: "string",
+        enum: Object.keys(INTEL_KINDS),
+        description:
+          "out: will not play. suspended: banned. benched: fit but not expected to start. doubt: may not be " +
+          "fit. rotation: may be rested. starting: confirmed or strongly expected to start. returning: back " +
+          "in training after an absence. penalties or setpieces: has taken over that duty. form: in a hot " +
+          "run beyond what the numbers show. note: anything else worth remembering.",
+      },
+      detail: { type: "string", description: "One short sentence of what was actually said or reported." },
+      confidence: {
+        type: "string",
+        enum: ["low", "medium", "high"],
+        description:
+          "high for a manager's own words or a confirmed line-up, medium for a credible report, low for a rumour.",
+      },
+      gameweeks: {
+        type: "integer",
+        description: "How many gameweeks this should count for. Leave out to use the sensible default.",
+      },
+      source: {
+        type: "string",
+        enum: ["you", "search"],
+        description: "Where it came from: 'you' if the user told you, 'search' if you read it.",
+      },
+      url: { type: "string", description: "The page it came from, if you read it." },
+    },
+    required: ["player", "kind", "detail"],
+  },
+};
+
+/** A compact player list for resolving the names Nova uses in a note. */
+async function playerIndex() {
+  const { data } = await getBootstrap();
+  const teams = new Map((data?.teams || []).map((t) => [t.id, t]));
+  return {
+    players: (data?.elements || []).map((e) => {
+      const team = teams.get(e.team) || {};
+      return {
+        id: e.id,
+        name: e.web_name,
+        fullName: `${e.first_name || ""} ${e.second_name || ""}`.trim(),
+        position: { 1: "GKP", 2: "DEF", 3: "MID", 4: "FWD" }[e.element_type] || "?",
+        teamShort: team.short_name || "",
+        teamName: team.name || "",
+      };
+    }),
+    nextEvent: (Number(data?.events?.current) || 0) + 1,
+  };
+}
+
+async function callAnthropic(body) {
+  const r = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-api-key": ANTHROPIC_API_KEY,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify(body),
+  });
+  const data = await r.json();
+  if (!r.ok) throw new Error(data?.error?.message || `Anthropic API error ${r.status}`);
+  return data;
+}
+
 app.post("/api/chat", async (req, res) => {
   if (!ANTHROPIC_API_KEY) {
     return res.status(400).json({
@@ -740,36 +864,77 @@ app.post("/api/chat", async (req, res) => {
   if (!Array.isArray(messages) || messages.length === 0) {
     return res.status(400).json({ error: "messages array required" });
   }
+
   try {
-    const r = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-api-key": ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
+    const { players, nextEvent } = await playerIndex();
+    const tools = [INTEL_TOOL];
+    if (WEB_SEARCH_ENABLED) tools.push(WEB_SEARCH_TOOL);
+
+    const turns = messages.slice(-20).map((m) => ({
+      role: m.role === "assistant" ? "assistant" : "user",
+      content: String(m.content || "").slice(0, 4000),
+    }));
+
+    const recorded = [];
+    const rejected = [];
+    const sources = [];
+    let reply = "";
+
+    // Nova may take several notes in one turn, and may want to search first, so
+    // the exchange runs as a short loop rather than a single call.
+    for (let round = 0; round < 4; round++) {
+      const data = await callAnthropic({
         model: MODEL,
-        // Searched answers need room for the tool exchange plus the reply.
-        max_tokens: WEB_SEARCH_ENABLED ? 2048 : 1024,
-        system: buildSystemPrompt(context, { webSearch: WEB_SEARCH_ENABLED }),
-        ...(WEB_SEARCH_ENABLED ? { tools: [WEB_SEARCH_TOOL] } : {}),
-        messages: messages.slice(-20).map((m) => ({
-          role: m.role === "assistant" ? "assistant" : "user",
-          content: String(m.content || "").slice(0, 4000),
-        })),
-      }),
-    });
-    const data = await r.json();
-    if (!r.ok) {
-      const msg = data?.error?.message || `Anthropic API error ${r.status}`;
-      return res.status(502).json({ error: msg });
+        max_tokens: 3072,
+        system: buildSystemPrompt(context, { webSearch: WEB_SEARCH_ENABLED, notes: context?.notes }),
+        tools,
+        messages: turns,
+      });
+      sources.push(...collectSources(data.content));
+      reply = (data.content || [])
+        .filter((b) => b.type === "text")
+        .map((b) => b.text)
+        .join("\n")
+        .trim() || reply;
+
+      const calls = (data.content || []).filter((b) => b.type === "tool_use" && b.name === INTEL_TOOL.name);
+      if (data.stop_reason !== "tool_use" && data.stop_reason !== "pause_turn") break;
+      turns.push({ role: "assistant", content: data.content });
+      if (!calls.length) {
+        // A pause with nothing for us to do means the API is mid-search.
+        if (data.stop_reason === "pause_turn") continue;
+        break;
+      }
+
+      const results = calls.map((call) => {
+        const built = buildNote(call.input, {
+          players,
+          event: nextEvent,
+          now: new Date().toISOString(),
+          source: call.input?.url ? "search" : call.input?.source,
+        });
+        if (built.error) {
+          rejected.push({ input: call.input, error: built.error });
+          return { type: "tool_result", tool_use_id: call.id, content: built.error, is_error: true };
+        }
+        recorded.push(built.note);
+        return {
+          type: "tool_result",
+          tool_use_id: call.id,
+          content: `Recorded for ${built.note.playerName} (${built.note.teamShort}). ${describeNote(built.note)} It counts until the end of gameweek ${built.note.expiresAfterEvent}.`,
+        };
+      });
+      turns.push({ role: "user", content: results });
     }
-    const text = (data.content || [])
-      .filter((b) => b.type === "text")
-      .map((b) => b.text)
-      .join("\n");
-    res.json({ reply: text, sources: collectSources(data.content) });
+
+    const seen = new Set();
+    res.json({
+      reply,
+      sources: sources.filter((s) => (seen.has(s.url) ? false : seen.add(s.url))).slice(0, 8),
+      // The client stores these, because that is where the notes live.
+      notes: recorded,
+      rejected,
+    });
   } catch (err) {
     res.status(502).json({ error: String(err.message || err) });
   }

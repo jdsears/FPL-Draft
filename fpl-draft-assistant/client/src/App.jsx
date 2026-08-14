@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fetchBootstrap, fetchLeague, fetchChoices, fetchLearning } from "./api.js";
 import { scopeFor, readLog, recordProjection } from "./learning.js";
+import { readNotes, addNotes, removeNote, pruneExpired } from "./notes.js";
 import DraftBoard from "./components/DraftBoard.jsx";
 import BestAvailable from "./components/BestAvailable.jsx";
 import Roster from "./components/Roster.jsx";
@@ -120,6 +121,8 @@ export default function App() {
   const [logVersion, setLogVersion] = useState(0);
   const [week, setWeek] = useState(null);
   const [agents, setAgents] = useState(null);
+  // Team news Nova has recorded, which adjusts projections until it expires.
+  const [notes, setNotes] = useState([]);
 
   useEffect(() => {
     fetchBootstrap()
@@ -347,6 +350,8 @@ export default function App() {
       claims: (agents?.upgrades || []).map((u) => u.summary),
       deadline: week?.deadline ? deadlineInWords(week.deadline) : null,
       learning: learning?.summary || [],
+      // So she neither repeats a note nor contradicts one silently.
+      notes,
     };
   }, [
     available,
@@ -361,6 +366,7 @@ export default function App() {
     week,
     agents,
     learning,
+    notes,
   ]);
 
   // The draft is one evening; the season is every week, so once the draft is
@@ -409,6 +415,28 @@ export default function App() {
   );
 
   const onRestored = useCallback(() => setLogVersion((v) => v + 1), []);
+
+  // ---- Team news notes ----
+  // Read once the gameweek is known, so anything that has expired is swept away
+  // rather than sitting there quietly suppressing a player.
+  useEffect(() => {
+    const live = pruneExpired(logScope, nextEvent);
+    // Hand back the same array when nothing changed, so the views that depend on
+    // it do not refetch for no reason.
+    setNotes((prev) =>
+      prev.length === live.length && prev.every((note, i) => note.id === live[i].id) ? prev : live
+    );
+  }, [logScope, nextEvent, currentEvent]);
+
+  const onNotes = useCallback(
+    (incoming) => {
+      if (!incoming?.length) return;
+      setNotes(addNotes(logScope, incoming));
+    },
+    [logScope]
+  );
+
+  const onForgetNote = useCallback((id) => setNotes(removeNote(logScope, id)), [logScope]);
 
   const onSetLeague = (id) => {
     setLeagueId(id);
@@ -469,6 +497,10 @@ export default function App() {
             myEntryId={myEntryId}
             corrections={corrections}
             onLoaded={onWeek}
+            notes={notes}
+            onForgetNote={onForgetNote}
+            onNotes={onNotes}
+            chatContext={chatContext}
           />
         )}
         {tab === "season" && (
@@ -477,6 +509,7 @@ export default function App() {
             myLeagueEntryId={myLeagueEntry?.id || null}
             squadsByEntryId={squadsByEntry}
             corrections={corrections}
+            notes={notes}
             learning={learning}
             learningError={learningError}
             onRestored={onRestored}
@@ -490,6 +523,7 @@ export default function App() {
             ownedElements={ownedElements}
             corrections={corrections}
             onLoaded={setAgents}
+            notes={notes}
           />
         )}
         {tab === "trades" && (
@@ -498,6 +532,7 @@ export default function App() {
             myEntryId={myEntryId}
             myElements={myElements}
             corrections={corrections}
+            notes={notes}
           />
         )}
         {tab === "board" && (
@@ -528,7 +563,7 @@ export default function App() {
           />
         )}
         {tab === "cheat" && <CheatSheet players={players} fixturesAvailable={fixturesAvailable} />}
-        {tab === "chat" && <Chat context={chatContext} />}
+        {tab === "chat" && <Chat context={chatContext} onNotes={onNotes} />}
       </main>
     </div>
   );

@@ -44,6 +44,7 @@ export default function SeasonView({
   myLeagueEntryId,
   squadsByEntryId,
   corrections,
+  notes,
   learning,
   learningError,
   onRestored,
@@ -63,11 +64,12 @@ export default function SeasonView({
       myEntryId: myLeagueEntryId || null,
       squadsByEntryId: JSON.parse(squadsKey),
       corrections,
+      notes,
     })
       .then(setData)
       .catch((e) => setError(String(e.message || e)))
       .finally(() => setLoading(false));
-  }, [leagueId, myLeagueEntryId, squadsKey, corrections]);
+  }, [leagueId, myLeagueEntryId, squadsKey, corrections, notes]);
 
   useEffect(load, [load]);
 
