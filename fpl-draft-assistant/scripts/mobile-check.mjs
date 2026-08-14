@@ -1,4 +1,5 @@
-// Mobile checks for the draft board, fixtures grid, best available and chat.
+// Mobile checks for the weekly lineup, draft board, fixtures grid, best
+// available and chat.
 //
 // Takes screenshots at one desktop and three phone widths, then checks each
 // view for horizontal page scroll, touch targets under 44px and text under
@@ -8,7 +9,9 @@
 //   npm run check:mobile
 //
 // Environment: APP_URL (default http://127.0.0.1:3000), SHOT_DIR (default
-// ./screenshots), CHROMIUM_PATH to reuse a browser already on the machine.
+// ./screenshots), CHROMIUM_PATH to reuse a browser already on the machine,
+// LEAGUE_ID and ENTRY_ID to start with a league already connected so the
+// head-to-head panel is on screen.
 
 import { chromium } from "playwright";
 import fs from "node:fs";
@@ -69,11 +72,56 @@ const notes = new Set();
 
 for (const width of WIDTHS) {
   const page = await browser.newPage({ viewport: { width, height: 900 } });
+  if (process.env.LEAGUE_ID) {
+    // The league is normally remembered from a previous visit, so seed it the
+    // same way the app itself would.
+    await page.addInitScript(
+      ({ league, entry }) => {
+        localStorage.setItem("fplda.leagueId", JSON.stringify(league));
+        if (entry) localStorage.setItem("fplda.myEntryId", JSON.stringify(Number(entry)));
+      },
+      { league: process.env.LEAGUE_ID, entry: process.env.ENTRY_ID }
+    );
+  }
   await page.goto(BASE, { waitUntil: "networkidle" });
-  await page.waitForSelector("table.board tbody tr");
+  await page.waitForSelector(".tabs");
 
   const views = [
-    ["board", async () => {}],
+    [
+      "week",
+      async () => {
+        await page.getByRole("tab", { name: "My week" }).click();
+        // Either the eleven, or the note explaining the squad is not set yet.
+        await page.waitForSelector(".week-lineup, .week .card");
+      },
+    ],
+    [
+      "week-expanded",
+      async () => {
+        const row = page.locator(".week-row").first();
+        if (await row.count()) {
+          await row.click();
+          await page.waitForSelector(".week-summary");
+        }
+      },
+    ],
+    [
+      "week-opponent",
+      async () => {
+        const show = page.locator(".week-rival button").first();
+        if (await show.count()) {
+          await show.click();
+          await page.waitForSelector(".week-rival .week-block");
+        }
+      },
+    ],
+    [
+      "board",
+      async () => {
+        await page.getByRole("tab", { name: "Draft board" }).click();
+        await page.waitForSelector("table.board tbody tr");
+      },
+    ],
     [
       "board-expanded",
       async () => {

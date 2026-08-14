@@ -8,9 +8,17 @@ import LeaguePanel from "./components/LeaguePanel.jsx";
 import FixturesTab from "./components/FixturesTab.jsx";
 import CheatSheet from "./components/CheatSheet.jsx";
 import SyncStatus from "./components/SyncStatus.jsx";
+import MyWeek from "./components/MyWeek.jsx";
 
 const SQUAD_LIMITS = { GKP: 2, DEF: 5, MID: 5, FWD: 3 };
 const POLL_MS = 10000;
+
+function ordinal(n) {
+  const value = Number(n) || 0;
+  const rest = value % 100;
+  if (rest >= 11 && rest <= 13) return `${value}th`;
+  return `${value}${["th", "st", "nd", "rd"][value % 10] || "th"}`;
+}
 
 function load(key, fallback) {
   try {
@@ -34,6 +42,7 @@ export default function App() {
   const [fixturesSource, setFixturesSource] = useState("");
   const [historyAvailable, setHistoryAvailable] = useState(true);
   const [departedExcluded, setDepartedExcluded] = useState(0);
+  const [currentEvent, setCurrentEvent] = useState(0);
 
   const [leagueId, setLeagueId] = useState(() => load("fplda.leagueId", ""));
   const [league, setLeague] = useState(null);
@@ -43,7 +52,8 @@ export default function App() {
   // element id -> { entryId | "me" | "gone" } ; live picks + manual marks
   const [manualMarks, setManualMarks] = useState(() => load("fplda.manualMarks", {}));
   const [livePicks, setLivePicks] = useState({});
-  const [tab, setTab] = useState("board");
+  // The draft is a one-off; the season is every week, so the week leads.
+  const [tab, setTab] = useState("week");
 
   useEffect(() => {
     fetchBootstrap()
@@ -54,6 +64,7 @@ export default function App() {
         setFixturesSource(d.fixturesSource || "");
         setHistoryAvailable(d.historyAvailable !== false);
         setDepartedExcluded(Number(d.departedExcluded) || 0);
+        setCurrentEvent(Number(d.currentEvent) || 0);
       })
       .catch((e) => setLoadError(String(e.message || e)));
   }, []);
@@ -159,6 +170,45 @@ export default function App() {
     () => players.filter((p) => draftedBy[p.id]?.mine),
     [players, draftedBy]
   );
+  const myElements = useMemo(() => myRoster.map((p) => p.id), [myRoster]);
+
+  // ---- Head to head ----
+  // Rival squads come from the draft picks, which is what the app can see
+  // without an authenticated session, so they are a draft-day snapshot.
+  const nextEvent = currentEvent + 1;
+  const myLeagueEntry = useMemo(
+    () => entries.find((e) => e.entry_id === myEntryId || e.id === myEntryId) || null,
+    [entries, myEntryId]
+  );
+  const squadsByEntry = useMemo(() => {
+    const map = {};
+    for (const [element, pick] of Object.entries(livePicks)) {
+      if (!pick.entryId) continue;
+      if (!map[pick.entryId]) map[pick.entryId] = [];
+      map[pick.entryId].push(Number(element));
+    }
+    return map;
+  }, [livePicks]);
+
+  const opponent = useMemo(() => {
+    if (!league || !myLeagueEntry) return null;
+    const mine = myLeagueEntry.id;
+    const match = (league.matches || []).find(
+      (m) => m.event === nextEvent && (m.league_entry_1 === mine || m.league_entry_2 === mine)
+    );
+    if (!match) return null;
+    const otherId = match.league_entry_1 === mine ? match.league_entry_2 : match.league_entry_1;
+    const entry = entries.find((e) => e.id === otherId);
+    if (!entry) return null;
+    const standing = (league.standings || []).find((s) => s.league_entry === otherId);
+    return {
+      name: entry.entry_name || `${entry.player_first_name} ${entry.player_last_name}`.trim(),
+      elements: squadsByEntry[entry.entry_id] || [],
+      record: standing
+        ? `Ranked ${ordinal(standing.rank)} on ${standing.total} league points with ${standing.points_for} scored`
+        : "",
+    };
+  }, [league, myLeagueEntry, entries, nextEvent, squadsByEntry]);
 
   const chatContext = useMemo(() => {
     const best = ["GKP", "DEF", "MID", "FWD"]
@@ -183,13 +233,21 @@ export default function App() {
         return pl ? `${pl.name} to ${entryName(p.entryId) || "a rival"}` : null;
       })
       .filter(Boolean);
+    const opponentSquad = (opponent?.elements || [])
+      .map((id) => players.find((p) => p.id === id))
+      .filter(Boolean)
+      .map((p) => `${p.name} (${p.position})`);
     return {
       myRoster: myRoster.map((p) => `${p.name} (${p.position})`),
       bestAvailable: best,
       recentPicks: recent,
       dataSource,
+      // Once the season starts the questions change, so tell Nova where we are.
+      gameweek: currentEvent > 0 ? nextEvent : null,
+      opponent: opponent?.name || null,
+      opponentSquad,
     };
-  }, [available, myRoster, livePicks, players, entryName, dataSource]);
+  }, [available, myRoster, livePicks, players, entryName, dataSource, currentEvent, nextEvent, opponent]);
 
   const onSetLeague = (id) => {
     setLeagueId(id);
@@ -214,6 +272,7 @@ export default function App() {
 
       <nav className="tabs" role="tablist">
         {[
+          ["week", "My week"],
           ["board", "Draft board"],
           ["best", "Best available"],
           ["fixtures", "Fixtures"],
@@ -241,6 +300,15 @@ export default function App() {
       {loadError && <div className="banner error">Could not load player data: {loadError}</div>}
 
       <main className="content">
+        {tab === "week" && (
+          <MyWeek
+            elements={myElements}
+            opponent={opponent}
+            myName={myLeagueEntry?.entry_name || "Your team"}
+            nextEvent={nextEvent}
+            leagueConnected={Boolean(league)}
+          />
+        )}
         {tab === "board" && (
           <DraftBoard
             players={players}

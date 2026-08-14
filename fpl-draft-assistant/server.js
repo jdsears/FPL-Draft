@@ -14,6 +14,7 @@ import {
 import { buildRankings } from "./lib/rankings.js";
 import { buildFixtureContext } from "./lib/fixtures.js";
 import { buildSeasonProjections, buildBaseline, PLANNING_WINDOW } from "./lib/season.js";
+import { pickLineup } from "./lib/lineup.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -40,6 +41,9 @@ app.get("/api/bootstrap", async (_req, res) => {
     res.json({
       source,
       ...rankings,
+      // The client needs to know which gameweek is next to work out who it is
+      // playing and what to project.
+      currentEvent: Number(data?.events?.current) || 0,
       teams: data.teams || [],
       fixtures: rankings.fixturesAvailable ? fixtureContext : null,
       fixturesSource: rankings.fixturesAvailable ? main.source : "unavailable",
@@ -49,28 +53,78 @@ app.get("/api/bootstrap", async (_req, res) => {
   }
 });
 
-// In-season projections: expected points per gameweek over a planning window
-// that starts at the next gameweek, rather than the draft board's valuation.
+/**
+ * Shared in-season projection build: expected points per gameweek over a
+ * planning window that starts at the next gameweek, rather than the draft
+ * board's valuation. Used by the season list and the weekly lineup alike so
+ * both always speak about players in the same numbers.
+ */
+async function projectSeason(windowRequest) {
+  const window = Math.min(Math.max(Number(windowRequest) || PLANNING_WINDOW, 1), 10);
+  const { data, source } = await getBootstrap();
+  if (source === "live") captureBaseline(data, buildBaseline);
+
+  const currentEvent = Number(data?.events?.current) || 0;
+  const main = await getMainGameData({ allowSample: source === "sample" });
+  const fixtureContext = buildFixtureContext(main.teams, main.fixtures, {
+    firstEvent: currentEvent + 1,
+    gameweeks: window,
+  });
+
+  const projections = buildSeasonProjections(data, {
+    fixtureContext,
+    currentEvent,
+    window,
+    baseline: readBaseline()?.players || null,
+  });
+  return { source, fixturesSource: main.source, fixtureContext, projections };
+}
+
 app.get("/api/season", async (req, res) => {
   try {
-    const window = Math.min(Math.max(Number(req.query.window) || PLANNING_WINDOW, 1), 10);
-    const { data, source } = await getBootstrap();
-    if (source === "live") captureBaseline(data, buildBaseline);
+    const { source, fixturesSource, fixtureContext, projections } = await projectSeason(req.query.window);
+    res.json({ source, fixturesSource, fixtures: fixtureContext, ...projections });
+  } catch (err) {
+    res.status(500).json({ error: String(err.message || err) });
+  }
+});
 
-    const currentEvent = Number(data?.events?.current) || 0;
-    const main = await getMainGameData({ allowSample: source === "sample" });
-    const fixtureContext = buildFixtureContext(main.teams, main.fixtures, {
-      firstEvent: currentEvent + 1,
-      gameweeks: window,
-    });
+/**
+ * The weekly decision: the best legal eleven from a squad, and the same for a
+ * head-to-head opponent so the week has a projected scoreline. The squads come
+ * from the client because it is the client that knows who owns whom, whether
+ * from live draft picks or manual marks.
+ */
+app.post("/api/my-week", async (req, res) => {
+  const ids = (value) => {
+    const list = Array.isArray(value) ? value : [];
+    return new Set(list.map(Number).filter((n) => Number.isFinite(n)));
+  };
+  try {
+    const mine = ids(req.body?.elements);
+    const theirs = ids(req.body?.opponentElements);
+    const { source, fixturesSource, fixtureContext, projections } = await projectSeason(req.body?.window);
 
-    const projections = buildSeasonProjections(data, {
-      fixtureContext,
-      currentEvent,
-      window,
-      baseline: readBaseline()?.players || null,
+    const squadFor = (set) => projections.players.filter((p) => set.has(p.id));
+    const mySquad = squadFor(mine);
+    const theirSquad = squadFor(theirs);
+
+    res.json({
+      source,
+      fixturesSource,
+      fixtures: fixtureContext,
+      currentEvent: projections.currentEvent,
+      nextEvent: projections.currentEvent + 1,
+      window: projections.window,
+      preSeason: projections.preSeason,
+      fixturesAvailable: projections.fixturesAvailable,
+      baselineAvailable: projections.baselineAvailable,
+      lineup: pickLineup(mySquad),
+      // A player who has left the league is dropped from the projection, so a
+      // squad can legitimately come back short of what was asked for.
+      unknown: mine.size - mySquad.length,
+      opponent: theirs.size ? pickLineup(theirSquad) : null,
     });
-    res.json({ source, fixturesSource: main.source, fixtures: fixtureContext, ...projections });
   } catch (err) {
     res.status(500).json({ error: String(err.message || err) });
   }
@@ -145,19 +199,39 @@ function collectSources(content) {
 }
 
 function buildSystemPrompt(context, { webSearch = false } = {}) {
+  // The same assistant serves two very different jobs: a one-off draft, and
+  // then a season of weekly decisions. Advice framed around picking players is
+  // useless once the squads are settled, so the framing follows the gameweek.
+  const gameweek = Number(context?.gameweek) || 0;
+  const inSeason = gameweek > 0;
   const lines = [
-    "You are Nova, a warm, witty Fantasy Premier League Draft strategist embedded in a draft-day app. Think charismatic match-day pundit: friendly, a little playful, always on the user's side, but focused on winning the draft. Keep the relationship professional and football-focused; deflect flirtation with light humour and steer back to the draft.",
+    `You are Nova, a warm, witty Fantasy Premier League Draft strategist embedded in an FPL Draft app. Think charismatic match-day pundit: friendly, a little playful, always on the user's side, but focused on winning their league. Keep the relationship professional and football-focused; deflect flirtation with light humour and steer back to the football.`,
     "League format: official FPL Draft, 10 teams, 15-player squads (2 GKP, 5 DEF, 5 MID, 3 FWD), snake draft, no player budgets, one owner per player.",
     "Scoring is standard FPL: appearance, goals (position-weighted), assists, clean sheets, bonus points; goalkeepers earn save points.",
-    "Core strategy principles: value over replacement matters more than raw points (elite MIDs and premium FWDs go early; GKP late); plan two picks ahead in a snake draft; watch positional runs; target secure starters over rotation risks; fixture difficulty matters for early-season momentum.",
-    "Answer briefly and decisively. When asked who to pick, give a clear first choice plus one alternative, with a one-line reason each.",
+    "Answer briefly and decisively. When asked to choose, give a clear first choice plus one alternative, with a one-line reason each.",
     "Use British English. Never use em dashes.",
-    `Today's date is ${todayInWords()}. A new Premier League season is about to start, so pre-season news matters: summer transfers, new managers, promoted clubs, friendlies form, predicted line-ups and injury updates all move draft value.`,
   ];
+  if (inSeason) {
+    lines.push(
+      `The draft is long finished and the season is under way. Gameweek ${gameweek} is next. Every question is about managing a settled squad, not about drafting.`,
+      "The levers available each week: which eleven of the fifteen to start (there is no captain in this league, so the eleven is the whole decision), claiming free agents or waivers, and proposing trades with rival managers. Head-to-head results decide the league, so beating one specific opponent this week can matter more than maximising points in the abstract.",
+      "In-season principles: minutes are worth more than reputation, because a benched star scores nothing; a short run of fixtures swings a week far more than a season average does; do not chase one big score from a player who does not start; a free agent who plays every week beats a squad player with a better name; when trading, value the rest of the season for both sides and be honest about which side wins.",
+      `Today's date is ${todayInWords()}. Team news moves fast, so injuries, suspensions, rotation and predicted line-ups for gameweek ${gameweek} matter more than anything historical.`
+    );
+  } else {
+    lines.push(
+      "Core draft principles: value over replacement matters more than raw points (elite MIDs and premium FWDs go early; GKP late); plan two picks ahead in a snake draft; watch positional runs; target secure starters over rotation risks; fixture difficulty matters for early-season momentum.",
+      `Today's date is ${todayInWords()}. A new Premier League season is about to start, so pre-season news matters: summer transfers, new managers, promoted clubs, friendlies form, predicted line-ups and injury updates all move draft value.`
+    );
+  }
   if (webSearch) {
     lines.push(
-      "You have a web search tool. Search when the answer depends on anything recent or anything after your training data: completed or rumoured transfers, injury and fitness news, pre-season form, predicted line-ups, penalty and set-piece duties, manager changes, or a player's current club. Search at most a couple of times, prefer recent and reputable football sources, and say plainly if the picture is still unclear.",
-      "Do not search for questions you can already answer well: draft strategy, scoring rules, positional value, snake-draft tactics, or reading the user's own roster. Those should come back fast."
+      inSeason
+        ? `You have a web search tool. Search when the answer depends on anything recent: injury and fitness updates, suspensions, predicted line-ups for gameweek ${gameweek}, rotation and rest, penalty and set-piece duties, a manager change, or a completed transfer. Search at most a couple of times, prefer recent and reputable football sources, and say plainly if the picture is still unclear.`
+        : "You have a web search tool. Search when the answer depends on anything recent or anything after your training data: completed or rumoured transfers, injury and fitness news, pre-season form, predicted line-ups, penalty and set-piece duties, manager changes, or a player's current club. Search at most a couple of times, prefer recent and reputable football sources, and say plainly if the picture is still unclear.",
+      inSeason
+        ? "Do not search for questions you can already answer well: the scoring rules, how the projections work, reading the user's own squad, or general advice on managing a squad. Those should come back fast."
+        : "Do not search for questions you can already answer well: draft strategy, scoring rules, positional value, snake-draft tactics, or reading the user's own roster. Those should come back fast."
     );
   } else {
     lines.push(
@@ -165,18 +239,30 @@ function buildSystemPrompt(context, { webSearch = false } = {}) {
     );
   }
   if (context?.myRoster?.length) {
-    lines.push(`The user's roster so far: ${context.myRoster.join(", ")}.`);
+    lines.push(
+      inSeason
+        ? `The user's squad: ${context.myRoster.join(", ")}.`
+        : `The user's roster so far: ${context.myRoster.join(", ")}.`
+    );
+  }
+  if (context?.opponent) {
+    lines.push(
+      `The user's head-to-head opponent in gameweek ${gameweek} is ${context.opponent}.` +
+        (context.opponentSquad?.length ? ` Their squad from the draft: ${context.opponentSquad.join(", ")}.` : "")
+    );
   }
   if (context?.nextPick) {
     lines.push(`The user picks next at overall pick ${context.nextPick}.`);
   }
   if (context?.bestAvailable) {
     lines.push(
-      "Best available by position right now (name, team, position, projected points, value over replacement, average difficulty of gameweeks 1 to 6 where 1 is easiest and 5 hardest):\n" +
+      (inSeason
+        ? "Players nobody in the league owns, by position, best first (name, team, position, projected points, value over replacement, average difficulty of the opening gameweeks where 1 is easiest and 5 hardest). These are the free agents available to claim:\n"
+        : "Best available by position right now (name, team, position, projected points, value over replacement, average difficulty of gameweeks 1 to 6 where 1 is easiest and 5 hardest):\n") +
         context.bestAvailable
     );
   }
-  if (context?.recentPicks?.length) {
+  if (!inSeason && context?.recentPicks?.length) {
     lines.push(`Most recent picks by other managers: ${context.recentPicks.join("; ")}.`);
   }
   if (context?.dataSource === "sample") {
