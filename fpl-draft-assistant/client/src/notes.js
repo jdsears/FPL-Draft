@@ -31,8 +31,21 @@ export function scopeFor(leagueId, entryId) {
 }
 
 export function readNotes(scope) {
-  const list = readAll()[scope];
-  return Array.isArray(list) ? list : [];
+  const entry = readAll()[scope];
+  // Older versions stored a bare array; treat it as notes with no tombstones.
+  if (Array.isArray(entry)) return entry;
+  return Array.isArray(entry?.notes) ? entry.notes : [];
+}
+
+/** Tombstones for notes deleted here, so a delete survives a sync round trip. */
+export function readDeleted(scope) {
+  const entry = readAll()[scope];
+  return Array.isArray(entry?.deleted) ? entry.deleted : [];
+}
+
+function writeScope(all, scope, notes, deleted) {
+  all[scope] = { notes, deleted };
+  return writeAll(all);
 }
 
 /** Add notes, replacing any earlier note of the same kind about the same player. */
@@ -44,22 +57,29 @@ export function addNotes(scope, incoming) {
     (note) => !fresh.some((n) => n.playerId === note.playerId && n.kind === note.kind)
   );
   const merged = existing.concat(fresh.map((note) => ({ ...note, id: note.id || crypto.randomUUID?.() || `${note.playerId}-${note.kind}-${Date.now()}` })));
-  all[scope] = merged;
-  writeAll(all);
+  writeScope(all, scope, merged, readDeleted(scope));
   return merged;
 }
 
 export function removeNote(scope, id) {
   const all = readAll();
-  all[scope] = readNotes(scope).filter((note) => note.id !== id);
-  writeAll(all);
-  return all[scope];
+  const notes = readNotes(scope);
+  const dead = notes.find((note) => note.id === id);
+  const kept = notes.filter((note) => note.id !== id);
+  // The tombstone must outlive the note, or another device pushes it back.
+  const deleted = dead
+    ? readDeleted(scope).concat({ id, until: Number(dead.expiresAfterEvent) || Number(dead.event) + 12 })
+    : readDeleted(scope);
+  writeScope(all, scope, kept, deleted);
+  return kept;
 }
 
 export function clearNotes(scope) {
   const all = readAll();
-  all[scope] = [];
-  writeAll(all);
+  const deleted = readDeleted(scope).concat(
+    readNotes(scope).map((note) => ({ id: note.id, until: Number(note.expiresAfterEvent) || Number(note.event) + 12 }))
+  );
+  writeScope(all, scope, [], deleted);
   return [];
 }
 
@@ -69,14 +89,19 @@ export function clearNotes(scope) {
  * quietly suppressing a player.
  */
 export function pruneExpired(scope, event) {
-  const live = readNotes(scope).filter((note) => {
+  const notes = readNotes(scope);
+  const live = notes.filter((note) => {
     const until = Number(note?.expiresAfterEvent);
-    return !Number.isFinite(until) || Number(event) <= until;
+    return !Number.isFinite(until) || !until || Number(event) <= until;
   });
-  const all = readAll();
-  if ((all[scope] || []).length !== live.length) {
-    all[scope] = live;
-    writeAll(all);
+  if (live.length !== notes.length) {
+    writeScope(readAll(), scope, live, readDeleted(scope));
   }
   return live;
+}
+
+/** Replace this device's copy with what a sync round trip handed back. */
+export function replaceState(scope, notes, deleted) {
+  writeScope(readAll(), scope, Array.isArray(notes) ? notes : [], Array.isArray(deleted) ? deleted : []);
+  return Array.isArray(notes) ? notes : [];
 }

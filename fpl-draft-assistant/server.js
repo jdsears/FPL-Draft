@@ -21,6 +21,8 @@ import { buildSeasonOverview } from "./lib/league.js";
 import { suggestTrades } from "./lib/trades.js";
 import { buildLearning, correctionsFrom, normaliseCorrections } from "./lib/learning.js";
 import { buildAdjustments, buildNote, pruneNotes, INTEL_KINDS, describeNote } from "./lib/intel.js";
+import { mergeState } from "./lib/syncstore.js";
+import fs from "fs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -450,6 +452,56 @@ app.get("/api/league/:id/element-status", async (req, res) => {
     res.json(await getElementStatus(req.params.id));
   } catch (err) {
     res.status(502).json({ error: String(err.message || err) });
+  }
+});
+
+/**
+ * The meeting point that keeps devices in agreement. Each browser pushes its
+ * notes and projection log; the server merges them with what it holds and hands
+ * back the union, which the browser stores. The file here is a cache, not a
+ * home: a redeploy wipes it, and the next device to visit repopulates it from
+ * its own storage, so nothing is lost while one signed-in browser remembers.
+ */
+const SYNC_PATH = path.join(__dirname, "lib", "sync-store.json");
+
+function readSyncStore() {
+  try {
+    const parsed = JSON.parse(fs.readFileSync(SYNC_PATH, "utf8"));
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+app.post("/api/sync", async (req, res) => {
+  try {
+    const leagueId = String(req.body?.leagueId || "");
+    const entryId = Number(req.body?.myEntryId) || 0;
+    if (!leagueId || !entryId) return res.status(400).json({ error: "leagueId and myEntryId required" });
+    const scope = `${leagueId}:${entryId}`;
+
+    // Expiry needs the gameweek, which the server knows more reliably than any
+    // one device with a stale tab.
+    const { data } = await getBootstrap();
+    const nextEvent = (Number(data?.events?.current) || 0) + 1;
+
+    const store = readSyncStore();
+    const merged = mergeState(store[scope], {
+      notes: Array.isArray(req.body?.notes) ? req.body.notes : [],
+      deleted: Array.isArray(req.body?.deleted) ? req.body.deleted : [],
+      log: req.body?.log && typeof req.body.log === "object" ? req.body.log : {},
+    }, nextEvent);
+
+    store[scope] = merged;
+    let persisted = true;
+    try {
+      fs.writeFileSync(SYNC_PATH, JSON.stringify(store));
+    } catch {
+      persisted = false;
+    }
+    res.json({ ...merged, persisted, nextEvent });
+  } catch (err) {
+    res.status(500).json({ error: String(err.message || err) });
   }
 });
 

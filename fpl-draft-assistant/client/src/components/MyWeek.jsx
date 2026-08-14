@@ -351,7 +351,7 @@ export default function MyWeek({
                 {note.sourceUrl ? (
                   <>
                     {" "}
-                    <a href={note.sourceUrl} target="_blank" rel="noreferrer noopener">
+                    <a className="note-source" href={note.sourceUrl} target="_blank" rel="noreferrer noopener">
                       source
                     </a>
                   </>

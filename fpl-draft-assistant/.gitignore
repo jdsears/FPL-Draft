@@ -6,3 +6,5 @@ screenshots/
 # lib/baseline.json is deliberately not ignored. It is last season's scoring
 # rates, captured before FPL wipes them at gameweek 1, and committing it is the
 # only way it survives a redeploy on a host with an ephemeral filesystem.
+# The sync cache is runtime state, per deployment, unlike the baseline.
+lib/sync-store.json

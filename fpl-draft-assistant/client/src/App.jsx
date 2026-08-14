@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { fetchBootstrap, fetchLeague, fetchChoices, fetchLearning } from "./api.js";
-import { scopeFor, readLog, recordProjection } from "./learning.js";
-import { readNotes, addNotes, removeNote, pruneExpired } from "./notes.js";
+import { fetchBootstrap, fetchLeague, fetchChoices, fetchLearning, syncState } from "./api.js";
+import { scopeFor, readLog, readLogMap, replaceLogMap, recordProjection } from "./learning.js";
+import { readNotes, readDeleted, addNotes, removeNote, pruneExpired, replaceState } from "./notes.js";
 import DraftBoard from "./components/DraftBoard.jsx";
 import BestAvailable from "./components/BestAvailable.jsx";
 import Roster from "./components/Roster.jsx";
@@ -424,11 +424,53 @@ export default function App() {
 
   // The projection for a gameweek has to be written down before it is played,
   // because afterwards the inputs have moved on and it cannot be recovered.
+  // ---- Cross-device sync ----
+  // Notes and the projection log live in this browser, which made a phone and a
+  // laptop drift. Every mutation and every return to the tab pushes this
+  // device's copy to the server and stores the union it hands back, so the
+  // devices meet in the middle within one round trip.
+  const syncBusy = useRef(false);
+  const requestSync = useCallback(() => {
+    if (!leagueId || !myEntryId || syncBusy.current) return;
+    syncBusy.current = true;
+    const scope = scopeFor(leagueId, myEntryId);
+    const pushedNotes = readNotes(scope);
+    const pushedDeleted = readDeleted(scope);
+    const pushedLog = readLogMap(scope);
+    syncState({ leagueId, myEntryId, notes: pushedNotes, deleted: pushedDeleted, log: pushedLog })
+      .then((merged) => {
+        // Adopt the union only when it differs from what was pushed, or every
+        // round trip would dirty state and trigger the next one.
+        const ids = (list) => (list || []).map((n) => n.id).sort().join(",");
+        if (ids(merged.notes) !== ids(pushedNotes) || ids(merged.deleted) !== ids(pushedDeleted)) {
+          setNotes(replaceState(scope, merged.notes, merged.deleted));
+        }
+        if (JSON.stringify(merged.log) !== JSON.stringify(pushedLog)) {
+          replaceLogMap(scope, merged.log);
+          setLogVersion((v) => v + 1);
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        syncBusy.current = false;
+      });
+  }, [leagueId, myEntryId]);
+
+  useEffect(() => {
+    requestSync();
+    const onVisible = () => {
+      if (document.visibilityState === "visible") requestSync();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [requestSync]);
+
+
   const onWeek = useCallback(
     (data) => {
       setWeek(data);
       if (!data?.lineup?.playable || !data.nextEvent) return;
-      recordProjection(logScope, {
+      const changed = recordProjection(logScope, {
         event: data.nextEvent,
         projected: data.lineup.expected,
         opponentProjected: data.opponent ? data.opponent.expected : null,
@@ -440,8 +482,9 @@ export default function App() {
           projected: p.season?.perGameweek,
         })),
       });
+      if (changed) requestSync();
     },
-    [logScope]
+    [logScope, requestSync]
   );
 
   const onRestored = useCallback(() => setLogVersion((v) => v + 1), []);
@@ -462,11 +505,18 @@ export default function App() {
     (incoming) => {
       if (!incoming?.length) return;
       setNotes(addNotes(logScope, incoming));
+      requestSync();
     },
-    [logScope]
+    [logScope, requestSync]
   );
 
-  const onForgetNote = useCallback((id) => setNotes(removeNote(logScope, id)), [logScope]);
+  const onForgetNote = useCallback(
+    (id) => {
+      setNotes(removeNote(logScope, id));
+      requestSync();
+    },
+    [logScope, requestSync]
+  );
 
   const onSetLeague = (id) => {
     setLeagueId(id);

@@ -11,6 +11,9 @@
   --purple: #7b2d8b;
   --warn: #ffcf5c;
   --danger: #ff6b81;
+  /* Nova's own colours, so she reads as a presence rather than a feature */
+  --nova-1: #c957ff;
+  --nova-2: #ff6ec7;
 
   /* Depth and shape, used everywhere so the surfaces read as one family */
   --radius: 14px;
@@ -365,9 +368,55 @@ table.board { width: 100%; border-collapse: collapse; background: var(--panel); 
 }
 .msg.assistant {
   background: var(--surface), var(--panel-2);
-  border: 1px solid var(--line); border-bottom-left-radius: 4px;
+  border: 1px solid rgba(201, 87, 255, 0.25); border-bottom-left-radius: 4px;
 }
 .msg.thinking { color: var(--muted); font-style: italic; }
+/* Nova's presence: a ring of her colours around the portrait, a heartbeat of a
+   glow, and an online dot. All of it decorative, all of it still under the
+   reduced-motion rule. */
+.nova-ring {
+  display: inline-flex; padding: 3px; border-radius: 50%; flex-shrink: 0;
+  background: conic-gradient(from 210deg, var(--nova-1), var(--accent), var(--nova-2), var(--nova-1));
+  animation: nova-breathe 3.4s ease-in-out infinite;
+}
+.nova-ring svg { display: block; }
+@keyframes nova-breathe {
+  0%, 100% { box-shadow: 0 0 14px -4px rgba(201, 87, 255, 0.55); }
+  50% { box-shadow: 0 0 22px -2px rgba(255, 110, 199, 0.7); }
+}
+.nova-name {
+  font-weight: 800; font-size: 16px;
+  background: linear-gradient(90deg, var(--nova-1), var(--nova-2));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.nova-presence { display: flex; align-items: center; gap: 6px; margin-top: 1px; }
+.presence-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--accent); box-shadow: 0 0 8px rgba(0, 255, 135, 0.8);
+  animation: presence-pulse 2.4s ease-in-out infinite;
+}
+@keyframes presence-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+/* Typing: three dots taking turns, the shape every messaging app taught */
+.typing { display: inline-flex; gap: 4px; padding: 4px 2px; }
+.typing span {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--nova-1); opacity: 0.5;
+  animation: typing-bounce 1.2s ease-in-out infinite;
+}
+.typing span:nth-child(2) { animation-delay: 0.15s; background: var(--nova-2); }
+.typing span:nth-child(3) { animation-delay: 0.3s; background: var(--accent); }
+@keyframes typing-bounce {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.45; }
+  30% { transform: translateY(-4px); opacity: 1; }
+}
+
+/* When Nova speaks outside the chat, her colours mark the words as hers */
+.week-summary { border-left: 3px solid var(--nova-1); }
+
 /* Web search citations under Nova's replies, lined up with her bubble */
 .sources {
   display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
@@ -826,6 +875,12 @@ table.board { width: 100%; border-collapse: collapse; background: var(--panel); 
 
 /* Team news notes */
 .week-news .week-row { align-items: flex-start; }
+/* A little link with a full-size thumb behind it, like the sync button. */
+.note-source { position: relative; display: inline-block; padding: 2px 4px; font-weight: 600; color: var(--accent); }
+.note-source::after {
+  content: ""; position: absolute; left: -6px; right: -6px;
+  top: 50%; height: 44px; transform: translateY(-50%);
+}
 .week-footnotes { margin: 0; line-height: 1.6; color: var(--muted-deep); }
 
 /* Recorded notes under a chat reply */

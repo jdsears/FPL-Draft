@@ -35,6 +35,9 @@ export const fetchLearning = (body) => postJson("/api/learning", body);
 /** Every one-for-one swap with every rival, valued both ways. */
 export const fetchTrades = (body) => postJson("/api/trades", body);
 
+/** Push this device's notes and log, get back the union across devices. */
+export const syncState = (body) => postJson("/api/sync", body);
+
 export async function sendChat(messages, context, options = {}) {
   const res = await fetch("/api/chat", {
     method: "POST",

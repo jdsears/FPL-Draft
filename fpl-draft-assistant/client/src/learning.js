@@ -50,7 +50,7 @@ export function recordProjection(scope, week) {
   if (!scope || !event) return false;
   const all = readAll();
   const forScope = all[scope] || {};
-  forScope[event] = {
+  const entry = {
     event,
     at: new Date().toISOString(),
     projected: Number(week.projected) || 0,
@@ -63,7 +63,26 @@ export function recordProjection(scope, week) {
       projected: Number(p.projected) || 0,
     })),
   };
+  // Rewriting an identical projection with a fresh timestamp would make every
+  // sync look like a change and chase its own tail. Only material changes count.
+  const strip = ({ at, ...rest }) => rest;
+  if (forScope[event] && JSON.stringify(strip(forScope[event])) === JSON.stringify(strip(entry))) {
+    return false;
+  }
+  forScope[event] = entry;
   all[scope] = forScope;
+  return writeAll(all);
+}
+
+/** One squad's log keyed by gameweek, the shape the sync endpoint speaks. */
+export function readLogMap(scope) {
+  return readAll()[scope] || {};
+}
+
+/** Replace one squad's log with what a sync round trip handed back. */
+export function replaceLogMap(scope, log) {
+  const all = readAll();
+  all[scope] = log && typeof log === "object" ? log : {};
   return writeAll(all);
 }
 

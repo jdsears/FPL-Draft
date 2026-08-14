@@ -102,11 +102,14 @@ export default function Chat({ context, onNotes }) {
   return (
     <section className="chat">
       <div className="chat-head">
-        <Avatar size={44} />
+        <span className="nova-ring">
+          <Avatar size={46} />
+        </span>
         <div>
-          <div className="pname">Nova</div>
-          <div className="pmeta">
-            {context?.gameweek ? `Your gameweek ${context.gameweek} strategist` : "Your draft-day strategist"}
+          <div className="nova-name">Nova</div>
+          <div className="pmeta nova-presence">
+            <span className="presence-dot" aria-hidden="true" />
+            Online · {context?.gameweek ? `thinking about gameweek ${context.gameweek}` : "ready for draft night"}
           </div>
         </div>
       </div>
@@ -140,7 +143,11 @@ export default function Chat({ context, onNotes }) {
         {busy && (
           <div className="msg-row assistant">
             <Avatar size={28} />
-            <div className="msg assistant thinking">Thinking…</div>
+            <div className="msg assistant thinking" aria-label="Nova is typing">
+              <span className="typing" aria-hidden="true">
+                <span /><span /><span />
+              </span>
+            </div>
           </div>
         )}
         <div ref={endRef} />

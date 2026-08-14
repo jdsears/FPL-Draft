@@ -136,7 +136,9 @@ for (const width of WIDTHS) {
     [
       "week-expanded",
       async () => {
-        const row = page.locator(".week-row").first();
+        // Player rows are buttons; team news rows are divs with a delete
+        // button, so the selector has to say which it means.
+        const row = page.locator("button.week-row").first();
         if (await row.count()) {
           await row.click();
           await page.waitForSelector(".week-summary");
@@ -165,7 +167,7 @@ for (const width of WIDTHS) {
       async () => {
         if (!(await openTab("Free agents"))) return "skip";
         await page.waitForSelector(".week .card");
-        await page.locator(".week-row").first().click();
+        await page.locator("button.week-row").first().click();
         await page.waitForSelector(".week-summary");
       },
     ],
