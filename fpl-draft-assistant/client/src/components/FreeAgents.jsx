@@ -119,7 +119,8 @@ export default function FreeAgents({
               "three short lines saying which of the suggested claims still make sense.",
           },
         ],
-        chatContext
+        chatContext,
+        { thorough: true }
       );
       setCheckSaid(result.reply || "Nothing new found.");
       if (result.notes?.length) onNotes?.(result.notes);

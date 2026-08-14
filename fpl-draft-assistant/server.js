@@ -867,8 +867,12 @@ app.post("/api/chat", async (req, res) => {
 
   try {
     const { players, nextEvent } = await playerIndex();
+    // A full news sweep across two squads needs more searching than a chat
+    // question, so the scout buttons ask for a bigger budget. Each search is
+    // billed, which is why it is per request rather than always on.
+    const thorough = req.body?.thorough === true;
     const tools = [INTEL_TOOL];
-    if (WEB_SEARCH_ENABLED) tools.push(WEB_SEARCH_TOOL);
+    if (WEB_SEARCH_ENABLED) tools.push({ ...WEB_SEARCH_TOOL, max_uses: thorough ? 8 : 3 });
 
     const turns = messages.slice(-20).map((m) => ({
       role: m.role === "assistant" ? "assistant" : "user",
@@ -882,10 +886,10 @@ app.post("/api/chat", async (req, res) => {
 
     // Nova may take several notes in one turn, and may want to search first, so
     // the exchange runs as a short loop rather than a single call.
-    for (let round = 0; round < 4; round++) {
+    for (let round = 0; round < (thorough ? 6 : 4); round++) {
       const data = await callAnthropic({
         model: MODEL,
-        max_tokens: 3072,
+        max_tokens: thorough ? 4096 : 3072,
         system: buildSystemPrompt(context, { webSearch: WEB_SEARCH_ENABLED, notes: context?.notes }),
         tools,
         messages: turns,

@@ -35,11 +35,11 @@ export const fetchLearning = (body) => postJson("/api/learning", body);
 /** Every one-for-one swap with every rival, valued both ways. */
 export const fetchTrades = (body) => postJson("/api/trades", body);
 
-export async function sendChat(messages, context) {
+export async function sendChat(messages, context, options = {}) {
   const res = await fetch("/api/chat", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ messages, context }),
+    body: JSON.stringify({ messages, context, thorough: options.thorough === true }),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || `Chat failed (${res.status})`);

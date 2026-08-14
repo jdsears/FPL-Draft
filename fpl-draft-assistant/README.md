@@ -23,8 +23,10 @@ gameweek it is.
   rivals are reflected.
 - **Trades**: every one-for-one swap with every rival, valued by re-picking both
   elevens, so you can see what a deal is worth to you and what it costs them.
-- **Team news that counts**: tell Nova what you have heard, or send her to look,
-  and she records it as a dated note that adjusts the player it is about.
+- **Team news that counts**: type what you have heard straight into the Team
+  news card, or press Check the news and Nova sweeps every player in your squad
+  and your opponent's, club by club. Either way she records dated notes that
+  adjust the players they are about.
   Selection news acts on playing time rather than the scoring rate, so a manager
   naming his starting striker overrides last season's minutes instead of nudging
   them, and a player he has dropped falls out of the eleven. Notes expire, say
@@ -70,7 +72,8 @@ gameweek it is.
      Nova searching the web. Each search she runs is billed per search on your
      own Anthropic key, on top of the usual message cost, so `off` is the
      cheaper setting if you only want tactical advice. She uses at most three
-     searches per answer and only for questions that turn on recent news.
+     searches per answer in chat, and up to eight for a full team news sweep
+     from the My week or Free agents buttons, so a sweep costs a few pence.
 4. **Get your link.** In Settings, under Networking, click "Generate Domain".
    Open that URL on your laptop or phone. That is your app.
 

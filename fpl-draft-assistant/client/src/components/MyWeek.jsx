@@ -150,7 +150,7 @@ export default function MyWeek({
       setScoutError("");
       setScoutSaid("");
       try {
-        const result = await sendChat([{ role: "user", content: ask }], chatContext);
+        const result = await sendChat([{ role: "user", content: ask }], chatContext, { thorough: true });
         setScoutSaid(result.reply || "Nothing new found.");
         if (result.notes?.length) onNotes?.(result.notes);
         else load();
@@ -163,13 +163,29 @@ export default function MyWeek({
     [scouting, chatContext, onNotes, load]
   );
 
+  // The sweep names every player on both sides, grouped by club, because one
+  // search of a club's press conference round-up covers several players at
+  // once, where one search per player would burn the budget on the first few.
   const scout = useCallback(() => {
     const event = data?.nextEvent || nextEvent;
+    const mine = [...(data?.lineup?.starters || []), ...(data?.lineup?.bench || [])];
+    const theirs = [...(data?.opponent?.starters || []), ...(data?.opponent?.bench || [])];
+    const byClub = new Map();
+    for (const player of [...mine, ...theirs]) {
+      const club = player.teamName || player.teamShort || "unknown";
+      if (!byClub.has(club)) byClub.set(club, new Set());
+      byClub.get(club).add(player.name);
+    }
+    const clubs = [...byClub.entries()]
+      .map(([club, names]) => `${club}: ${[...names].join(", ")}`)
+      .join("; ");
     return askNova(
-      `Check the latest team news for gameweek ${event}, for my eleven and my bench, and for my opponent's ` +
-        "likely eleven. Search for injuries, suspensions, illness, expected line-ups and anything a manager has " +
-        "said this week. Record everything you find with record_intel so it reaches the projections. Then reply " +
-        "in at most three short lines, saying only what changes who I should start."
+      `Do a full team news sweep for gameweek ${event}. The players that matter, by club, covering my squad` +
+        `${theirs.length ? " and my opponent's" : ""}: ${clubs || "my squad"}. ` +
+        "Work club by club, searching each club's latest press conference, injury and predicted line-up news " +
+        "rather than one search per player, since a round-up covers several of these at once. Record everything " +
+        "factual with record_intel, one note per player, including confirmed starters. Then reply in at most " +
+        "four short lines, saying only what changes who I should start."
     );
   }, [askNova, data, nextEvent]);
 
