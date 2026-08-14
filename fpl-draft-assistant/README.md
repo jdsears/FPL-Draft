@@ -142,12 +142,46 @@ work because the player leaving their squad was not in their eleven anyway. Any
 deal beyond that needs them to value the player differently from you, which is a
 conversation rather than a calculation.
 
+## Capture last season's rates before gameweek 1
+
+Do this once, before the season starts. It cannot be done afterwards.
+
+At gameweek 1 the draft game resets every player's points, minutes and points
+per game for the new season. For the first few gameweeks that leaves the weekly
+projection working from a one or two match sample, which is not enough to tell a
+good player having a slow start from a bad one. So the model keeps last season's
+per-match rates as a small prior, worth 15%, which fades as real evidence
+arrives.
+
+The server snapshots those rates by itself the first time it sees live
+pre-season data, but it writes them to disk, and a host like Railway rebuilds its
+filesystem on every deploy. So the snapshot needs committing to the repository:
+
+- **From the deployed app**, open `your-app-url/api/baseline`. It downloads a
+  `baseline.json`. Put it in `lib/baseline.json` in your repository and commit
+  it. On GitHub that is Add file, then Upload files, into the `lib` folder.
+- **Or locally**, if you have Node installed:
+
+  ```
+  npm run capture:baseline
+  git add lib/baseline.json && git commit -m "Snapshot last season's rates"
+  ```
+
+Both refuse to run once a gameweek has been played, because by then the numbers
+they would capture are the new season's. If you miss the window nothing breaks:
+the model simply drops the prior and says so.
+
 ## Notes
 
 - If the FPL API is unreachable, the app shows a small built-in demo dataset
   and a "Demo data" badge so you always see a working interface. On Railway
   you should see the "Live FPL data" badge.
-- Your roster and league ID are stored only in your own browser.
+- The tabs follow the calendar. Before your draft you get the draft board, best
+  available and the cheat sheet. Once the league reports the draft complete
+  those give way to the weekly tools, and the board stays on as Players.
+- Your roster and league ID are stored only in your own browser. Squads are read
+  from your league itself once you connect it, so you do not have to mark
+  anything by hand.
 
 ## How the rankings work
 
@@ -192,8 +226,9 @@ Then open http://localhost:3000.
 Two checks are available for anyone changing the code:
 
 ```
-npm test              # unit tests for the models, fixture maths and lineup picking
-npm run check:mobile   # screenshots and mobile checks, needs the app running
+npm test                 # unit tests for the models, fixture maths and lineup picking
+npm run check:mobile     # screenshots and mobile checks, needs the app running
+npm run capture:baseline # snapshot last season's rates, pre-season only
 ```
 
 `npm run check:mobile` accepts `LEAGUE_ID` and `ENTRY_ID` so the head-to-head

@@ -398,6 +398,37 @@ app.get("/api/league/:id/element-status", async (req, res) => {
   }
 });
 
+/**
+ * The pre-season snapshot, as a file to save. The server takes this by itself
+ * the first time it sees live pre-season data, but it writes to disk, and a host
+ * that rebuilds its filesystem on deploy loses it. Downloading this and
+ * committing it to lib/baseline.json makes it permanent, which matters because
+ * once gameweek 1 starts the numbers behind it no longer exist anywhere.
+ */
+app.get("/api/baseline", async (_req, res) => {
+  const offer = (baseline) => {
+    res.setHeader("content-disposition", 'attachment; filename="baseline.json"');
+    res.json(baseline);
+  };
+  const existing = readBaseline();
+  if (existing) return offer(existing);
+  try {
+    const { data, source } = await getBootstrap();
+    if (source !== "live") {
+      return res.status(503).json({ error: "Live FPL data is unreachable, so there is nothing to snapshot." });
+    }
+    const current = Number(data?.events?.current) || 0;
+    if (current > 0) {
+      return res.status(409).json({
+        error: `Gameweek ${current} has been played, so the feed now holds this season's numbers rather than last season's. There is nothing left to capture.`,
+      });
+    }
+    return offer(buildBaseline(data));
+  } catch (err) {
+    return res.status(502).json({ error: String(err.message || err) });
+  }
+});
+
 app.get("/api/game", async (_req, res) => {
   try {
     res.json(await getGameStatus());

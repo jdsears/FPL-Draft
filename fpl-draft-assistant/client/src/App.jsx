@@ -16,6 +16,37 @@ import Trades from "./components/Trades.jsx";
 const SQUAD_LIMITS = { GKP: 2, DEF: 5, MID: 5, FWD: 3 };
 const POLL_MS = 10000;
 
+/**
+ * Which tabs to show. Best available and the cheat sheet exist to get you
+ * through a draft evening, so once the draft is done they are clutter, and the
+ * board becomes a player reference rather than something you pick from. Eleven
+ * tabs is too many to scan on a phone.
+ */
+function tabsFor(seasonMode, rosterSize) {
+  const season = [
+    ["week", "My week"],
+    ["season", "Season"],
+    ["agents", "Free agents"],
+    ["trades", "Trades"],
+    ["roster", `My team (${rosterSize}/15)`],
+    ["fixtures", "Fixtures"],
+    ["board", "Players"],
+    ["league", "League"],
+    ["chat", "AI assistant"],
+  ];
+  const draft = [
+    ["board", "Draft board"],
+    ["best", "Best available"],
+    ["fixtures", "Fixtures"],
+    ["roster", `My team (${rosterSize}/15)`],
+    ["league", "League"],
+    ["cheat", "Cheat sheet"],
+    ["chat", "AI assistant"],
+    ["week", "My week"],
+  ];
+  return seasonMode ? season : draft;
+}
+
 function ordinal(n) {
   const value = Number(n) || 0;
   const rest = value % 100;
@@ -55,8 +86,9 @@ export default function App() {
   // element id -> { entryId | "me" | "gone" } ; live picks + manual marks
   const [manualMarks, setManualMarks] = useState(() => load("fplda.manualMarks", {}));
   const [livePicks, setLivePicks] = useState({});
-  // The draft is a one-off; the season is every week, so the week leads.
-  const [tab, setTab] = useState("week");
+  // Null until the user picks one, so the landing tab can follow whether the
+  // draft is still to come.
+  const [chosenTab, setTab] = useState(null);
 
   useEffect(() => {
     fetchBootstrap()
@@ -263,6 +295,12 @@ export default function App() {
     };
   }, [available, myRoster, livePicks, players, entryName, dataSource, seasonMode, nextEvent, opponent]);
 
+  // The draft is one evening; the season is every week, so once the draft is
+  // done the week leads. A tab that disappears with the draft falls back rather
+  // than leaving a blank page.
+  const tabs = tabsFor(seasonMode, myRoster.length);
+  const tab = chosenTab && tabs.some(([key]) => key === chosenTab) ? chosenTab : tabs[0][0];
+
   const onSetLeague = (id) => {
     setLeagueId(id);
     save("fplda.leagueId", id);
@@ -285,19 +323,7 @@ export default function App() {
       </header>
 
       <nav className="tabs" role="tablist">
-        {[
-          ["week", "My week"],
-          ["season", "Season"],
-          ["agents", "Free agents"],
-          ["trades", "Trades"],
-          ["board", "Draft board"],
-          ["best", "Best available"],
-          ["fixtures", "Fixtures"],
-          ["roster", `My team (${myRoster.length}/15)`],
-          ["league", "League"],
-          ["cheat", "Cheat sheet"],
-          ["chat", "AI assistant"],
-        ].map(([key, label]) => (
+        {tabs.map(([key, label]) => (
           <button
             key={key}
             role="tab"

@@ -3,4 +3,6 @@ client/node_modules/
 client/dist/
 screenshots/
 .DS_Store
-lib/baseline.json
+# lib/baseline.json is deliberately not ignored. It is last season's scoring
+# rates, captured before FPL wipes them at gameweek 1, and committing it is the
+# only way it survives a redeploy on a host with an ephemeral filesystem.

@@ -9,7 +9,8 @@
     "start": "node server.js",
     "dev": "node server.js",
     "test": "node --test",
-    "check:mobile": "node scripts/mobile-check.mjs"
+    "check:mobile": "node scripts/mobile-check.mjs",
+    "capture:baseline": "node scripts/capture-baseline.mjs"
   },
   "engines": {
     "node": ">=18"

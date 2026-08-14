@@ -1,5 +1,6 @@
-// Mobile checks for the weekly lineup, draft board, fixtures grid, best
-// available and chat.
+// Mobile checks for every view the app has: the weekly lineup, the season, free
+// agents, trades, the player board, fixtures and chat, plus the draft-night
+// views when the draft is still to come.
 //
 // Takes screenshots at one desktop and three phone widths, then checks each
 // view for horizontal page scroll, touch targets under 44px and text under
@@ -86,11 +87,25 @@ for (const width of WIDTHS) {
   await page.goto(BASE, { waitUntil: "networkidle" });
   await page.waitForSelector(".tabs");
 
+  // The tab strip changes once the draft is done: the board is renamed and the
+  // draft-night tools go away. A view whose tab is not on screen is skipped
+  // rather than checked against whatever was showing before.
+  const openTab = async (...names) => {
+    for (const name of names) {
+      const tab = page.getByRole("tab", { name, exact: true });
+      if (await tab.count()) {
+        await tab.click();
+        return true;
+      }
+    }
+    return false;
+  };
+
   const views = [
     [
       "week",
       async () => {
-        await page.getByRole("tab", { name: "My week" }).click();
+        if (!(await openTab("My week"))) return "skip";
         // Either the eleven, or the note explaining the squad is not set yet.
         await page.waitForSelector(".week-lineup, .week .card");
       },
@@ -118,14 +133,14 @@ for (const width of WIDTHS) {
     [
       "season",
       async () => {
-        await page.getByRole("tab", { name: "Season" }).click();
+        if (!(await openTab("Season"))) return "skip";
         await page.waitForSelector(".week .card");
       },
     ],
     [
       "free-agents",
       async () => {
-        await page.getByRole("tab", { name: "Free agents" }).click();
+        if (!(await openTab("Free agents"))) return "skip";
         await page.waitForSelector(".week .card");
         await page.locator(".week-row").first().click();
         await page.waitForSelector(".week-summary");
@@ -134,14 +149,14 @@ for (const width of WIDTHS) {
     [
       "trades",
       async () => {
-        await page.getByRole("tab", { name: "Trades" }).click();
+        if (!(await openTab("Trades"))) return "skip";
         await page.waitForSelector(".week .card");
       },
     ],
     [
       "board",
       async () => {
-        await page.getByRole("tab", { name: "Draft board" }).click();
+        if (!(await openTab("Draft board", "Players"))) return "skip";
         await page.waitForSelector("table.board tbody tr");
       },
     ],
@@ -155,7 +170,7 @@ for (const width of WIDTHS) {
     [
       "fixtures",
       async () => {
-        await page.getByRole("tab", { name: "Fixtures" }).click();
+        if (!(await openTab("Fixtures"))) return "skip";
         // The tab shows a note instead of a grid when fixtures are unavailable.
         await page.waitForSelector(".fixtures, .card");
       },
@@ -163,21 +178,21 @@ for (const width of WIDTHS) {
     [
       "best-available",
       async () => {
-        await page.getByRole("tab", { name: "Best available" }).click();
+        if (!(await openTab("Best available"))) return "skip";
         await page.waitForSelector(".best-grid");
       },
     ],
     [
       "cheat-sheet",
       async () => {
-        await page.getByRole("tab", { name: "Cheat sheet" }).click();
+        if (!(await openTab("Cheat sheet"))) return "skip";
         await page.waitForSelector(".cheat, .card");
       },
     ],
     [
       "chat",
       async () => {
-        await page.getByRole("tab", { name: "AI assistant" }).click();
+        if (!(await openTab("AI assistant"))) return "skip";
         await page.waitForSelector(".chat");
         await page.locator(".chat-input input").fill("Any transfer news I should know?");
         await page.locator(".chat-input button").click();
@@ -191,7 +206,10 @@ for (const width of WIDTHS) {
   ];
 
   for (const [name, setup] of views) {
-    await setup();
+    if ((await setup()) === "skip") {
+      console.log(`  skipped ${name} @ ${width}px, not available in this mode`);
+      continue;
+    }
     await page.screenshot({ path: `${OUT}/${name}-${width}.png`, fullPage: name !== "chat" });
     const r = await page.evaluate(audit, { minTarget: MIN_TARGET, minFont: MIN_FONT });
     const label = `${name} @ ${width}px`;
