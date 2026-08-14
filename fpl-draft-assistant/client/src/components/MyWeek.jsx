@@ -10,19 +10,6 @@ import WeekActions from "./WeekActions.jsx";
 
 const ORDER = ["GKP", "DEF", "MID", "FWD"];
 const POSITION_NAMES = { GKP: "Goalkeeper", DEF: "Defenders", MID: "Midfielders", FWD: "Forwards" };
-const OUTFIELD_LABELS = ["First sub", "Second sub", "Third sub"];
-
-/** Name each bench slot. The goalkeeper's slot is locked, the rest are ordered. */
-function benchLabels(bench) {
-  let outfield = 0;
-  return bench.map((player) => {
-    if (player.position === "GKP") return { player, note: "Reserve GK" };
-    const note = OUTFIELD_LABELS[outfield] || "Sub";
-    outfield += 1;
-    return { player, note };
-  });
-}
-
 /** The deadline, and how long is left, in one line. */
 export function deadlineLine(deadline) {
   const when = new Date(deadline?.at);
@@ -324,7 +311,14 @@ export default function MyWeek({
 
       {lineup?.playable && (
         <div className="card week-lineup">
-          <Pitch starters={lineup.starters} label={lineup.label} expanded={expanded} onToggle={toggle}>
+          <Pitch
+            starters={lineup.starters}
+            bench={lineup.bench}
+            label={lineup.label}
+            expanded={expanded}
+            onToggle={toggle}
+            runFor={runFor}
+          >
             {expandedPlayer && (
               <div className="pitch-detail">
                 <div className="pitch-detail-head">
@@ -344,30 +338,13 @@ export default function MyWeek({
             )}
           </Pitch>
           <p className="pmeta pitch-hint">
-            Tap a player for the reasoning. A dot marks somebody worth checking before you confirm.
+            Tap a player for the reasoning. A dot marks somebody worth checking. On the bench, the reserve
+            goalkeeper is locked to the first slot and can only replace your goalkeeper; the outfielders come on
+            in the order shown, and only if a starter does not play.
           </p>
         </div>
       )}
 
-      {lineup && lineup.bench.length > 0 && (
-        <div className="card week-bench">
-          <h3>Bench</h3>
-          <p className="pmeta">
-            Order matters only when a starter does not play. The reserve goalkeeper is locked to the first
-            bench slot and can only replace your goalkeeper.
-          </p>
-          {benchLabels(lineup.bench).map(({ player, note }) => (
-            <PlayerLine
-              key={player.id}
-              player={player}
-              run={runFor(player)}
-              note={note}
-              expanded={expanded === player.id}
-              onToggle={toggle}
-            />
-          ))}
-        </div>
-      )}
 
       {data?.opponent?.playable && (
         <div className="card week-rival">
