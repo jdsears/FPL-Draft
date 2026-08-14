@@ -116,6 +116,13 @@ for (const width of WIDTHS) {
       },
     ],
     [
+      "season",
+      async () => {
+        await page.getByRole("tab", { name: "Season" }).click();
+        await page.waitForSelector(".week .card");
+      },
+    ],
+    [
       "free-agents",
       async () => {
         await page.getByRole("tab", { name: "Free agents" }).click();

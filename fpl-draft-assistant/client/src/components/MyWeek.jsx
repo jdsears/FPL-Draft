@@ -88,7 +88,15 @@ function Scoreline({ lineup, opponent, myName, opponentName }) {
   );
 }
 
-export default function MyWeek({ elements, opponent, myName, nextEvent, leagueConnected }) {
+export default function MyWeek({
+  elements,
+  opponent,
+  myName,
+  nextEvent,
+  leagueConnected,
+  leagueId,
+  myEntryId,
+}) {
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -104,20 +112,25 @@ export default function MyWeek({ elements, opponent, myName, nextEvent, leagueCo
   );
 
   const load = useCallback(() => {
-    if (!mineKey) {
+    // With a league connected the server reads the squads itself, which is the
+    // only way to see waiver moves. Marked players are the fallback.
+    if (!mineKey && !(leagueId && myEntryId)) {
       setData(null);
       return;
     }
     setLoading(true);
     setError("");
-    fetchMyWeek(
-      mineKey.split(",").map(Number),
-      theirsKey ? theirsKey.split(",").map(Number) : []
-    )
+    fetchMyWeek({
+      leagueId: leagueId || null,
+      myEntryId: myEntryId || null,
+      opponentEntryId: opponent?.entryId || null,
+      elements: mineKey ? mineKey.split(",").map(Number) : [],
+      opponentElements: theirsKey ? theirsKey.split(",").map(Number) : [],
+    })
       .then(setData)
       .catch((e) => setError(String(e.message || e)))
       .finally(() => setLoading(false));
-  }, [mineKey, theirsKey]);
+  }, [mineKey, theirsKey, leagueId, myEntryId, opponent]);
 
   useEffect(load, [load]);
 
@@ -132,7 +145,7 @@ export default function MyWeek({ elements, opponent, myName, nextEvent, leagueCo
   }, [data]);
   const runFor = useCallback((player) => runs[player.fixtureTeam] || null, [runs]);
 
-  if (!elements.length) {
+  if (!elements.length && !(leagueId && myEntryId)) {
     return (
       <section className="week">
         <div className="card">

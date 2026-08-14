@@ -21,11 +21,13 @@ async function postJson(url, body) {
 }
 
 /** The best legal eleven for a squad, and the opponent's, for one gameweek. */
-export const fetchMyWeek = (elements, opponentElements) =>
-  postJson("/api/my-week", { elements, opponentElements });
+export const fetchMyWeek = (body) => postJson("/api/my-week", body);
 
 /** Unowned players ranked for the gameweeks ahead, plus the swaps worth making. */
 export const fetchFreeAgents = (body) => postJson("/api/free-agents", body);
+
+/** The league table, every squad's strength, and the run of opponents left. */
+export const fetchSeasonOverview = (body) => postJson("/api/season-overview", body);
 
 export async function sendChat(messages, context) {
   const res = await fetch("/api/chat", {

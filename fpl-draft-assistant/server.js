@@ -16,6 +16,7 @@ import { buildFixtureContext } from "./lib/fixtures.js";
 import { buildSeasonProjections, buildBaseline, PLANNING_WINDOW } from "./lib/season.js";
 import { pickLineup } from "./lib/lineup.js";
 import { buildWaiverBoard } from "./lib/waivers.js";
+import { buildSeasonOverview } from "./lib/league.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -97,23 +98,29 @@ app.get("/api/season", async (req, res) => {
  * from live draft picks or manual marks.
  */
 app.post("/api/my-week", async (req, res) => {
-  const ids = (value) => {
-    const list = Array.isArray(value) ? value : [];
-    return new Set(list.map(Number).filter((n) => Number.isFinite(n)));
-  };
   try {
-    const mine = ids(req.body?.elements);
-    const theirs = ids(req.body?.opponentElements);
+    // The league's own ownership feed knows about waiver moves since the draft,
+    // so prefer it over whatever the client has marked.
+    const ownership = await readOwnership(req.body?.leagueId);
+    const squadOf = (entryId, fallback) => {
+      const fromFeed = entryId ? ownership.byEntry.get(Number(entryId)) : null;
+      return { elements: new Set(fromFeed || elementIds(fallback)), fromFeed: Boolean(fromFeed) };
+    };
+
+    const me = squadOf(req.body?.myEntryId, req.body?.elements);
+    const them = squadOf(req.body?.opponentEntryId, req.body?.opponentElements);
     const { source, fixturesSource, fixtureContext, projections } = await projectSeason(req.body?.window);
 
     const squadFor = (set) => projections.players.filter((p) => set.has(p.id));
-    const mySquad = squadFor(mine);
-    const theirSquad = squadFor(theirs);
+    const mySquad = squadFor(me.elements);
+    const theirSquad = squadFor(them.elements);
 
     res.json({
       source,
       fixturesSource,
       fixtures: fixtureContext,
+      squadSource: me.fromFeed ? "league" : "marks",
+      ownershipError: ownership.error,
       currentEvent: projections.currentEvent,
       nextEvent: projections.currentEvent + 1,
       window: projections.window,
@@ -123,51 +130,89 @@ app.post("/api/my-week", async (req, res) => {
       lineup: pickLineup(mySquad),
       // A player who has left the league is dropped from the projection, so a
       // squad can legitimately come back short of what was asked for.
-      unknown: mine.size - mySquad.length,
-      opponent: theirs.size ? pickLineup(theirSquad) : null,
+      unknown: me.elements.size - mySquad.length,
+      opponent: them.elements.size ? pickLineup(theirSquad) : null,
     });
   } catch (err) {
     res.status(500).json({ error: String(err.message || err) });
   }
 });
 
-/**
- * Free agents and the claims worth making. Ownership comes from the league's
- * element-status feed when it answers, because that is the only source that
- * knows about waiver moves since the draft. If it does not, the client's own
- * view of who was drafted stands in, and the response says which was used.
- */
-app.post("/api/free-agents", async (req, res) => {
-  const ids = (value) => (Array.isArray(value) ? value.map(Number).filter((n) => Number.isFinite(n)) : []);
-  try {
-    const leagueId = req.body?.leagueId;
-    let owned = null;
-    let ownershipSource = "picks";
-    let ownershipError = "";
-    let pendingClaims = 0;
+const elementIds = (value) =>
+  Array.isArray(value) ? value.map(Number).filter((n) => Number.isFinite(n)) : [];
 
-    if (leagueId) {
-      try {
-        const rows = (await getElementStatus(leagueId))?.element_status || [];
-        if (rows.length) {
-          owned = new Set();
-          for (const row of rows) {
-            const element = Number(row.element);
-            const unowned = row.owner === null || row.owner === undefined;
-            // A player under a pending claim is not really available.
-            const free = unowned && (row.status === undefined || String(row.status).toLowerCase() === "a");
-            if (!free) owned.add(element);
-            if (unowned && !free) pendingClaims += 1;
-          }
-          ownershipSource = "league";
-        }
-      } catch (err) {
-        ownershipError = String(err.message || err);
+/**
+ * Who owns whom, from the league's element-status feed. This is the only source
+ * that knows about waiver moves since the draft, so it is preferred everywhere,
+ * with the client's own view of the draft as the fallback.
+ *
+ * The feed's owner field carries an entry_id. That is a different number from
+ * the league_entry id used by the matches and standings feeds, so anything that
+ * needs to line up with those has to be mapped through league_entries.
+ */
+async function readOwnership(leagueId) {
+  const empty = {
+    byEntry: new Map(),
+    owned: new Set(),
+    source: "unavailable",
+    error: "",
+    pendingClaims: 0,
+  };
+  if (!leagueId) return empty;
+  try {
+    const rows = (await getElementStatus(leagueId))?.element_status || [];
+    if (!rows.length) return empty;
+    const byEntry = new Map();
+    const owned = new Set();
+    let pendingClaims = 0;
+    for (const row of rows) {
+      const element = Number(row.element);
+      const owner = row.owner === null || row.owner === undefined ? null : Number(row.owner);
+      if (owner !== null) {
+        if (!byEntry.has(owner)) byEntry.set(owner, []);
+        byEntry.get(owner).push(element);
+        owned.add(element);
+      } else if (row.status !== undefined && String(row.status).toLowerCase() !== "a") {
+        // Unowned but not available means a claim is already in for them.
+        owned.add(element);
+        pendingClaims += 1;
       }
     }
-    if (!owned) owned = new Set(ids(req.body?.ownedElements));
+    return { byEntry, owned, source: "league", error: "", pendingClaims };
+  } catch (err) {
+    return { ...empty, error: String(err.message || err) };
+  }
+}
 
-    const mine = new Set(ids(req.body?.elements));
+/**
+ * Free agents and the claims worth making.
+ */
+app.post("/api/free-agents", async (req, res) => {
+  try {
+    const leagueId = req.body?.leagueId;
+    const ownership = await readOwnership(leagueId);
+    const myEntryId = Number(req.body?.myEntryId) || null;
+    const fromFeed = myEntryId ? ownership.byEntry.get(myEntryId) : null;
+
+    // Waiver order decides who gets first refusal, so it changes whether a
+    // claim is worth making at all.
+    let waiver = null;
+    let transactionMode = "";
+    if (leagueId) {
+      try {
+        const details = await getLeagueDetails(leagueId);
+        transactionMode = details?.league?.transaction_mode || "";
+        const entries = details?.league_entries || [];
+        const me = entries.find((e) => String(e.entry_id) === String(myEntryId));
+        if (me && Number(me.waiver_pick)) waiver = { pick: Number(me.waiver_pick), of: entries.length };
+      } catch {
+        // The waiver order is a nicety; the rankings stand without it.
+      }
+    }
+
+    const owned = ownership.source === "league" ? ownership.owned : new Set(elementIds(req.body?.ownedElements));
+    const mine = new Set(fromFeed || elementIds(req.body?.elements));
+
     const { source, fixturesSource, fixtureContext, projections } = await projectSeason(req.body?.window);
     const board = buildWaiverBoard(projections.players, { owned, mine });
 
@@ -175,9 +220,12 @@ app.post("/api/free-agents", async (req, res) => {
       source,
       fixturesSource,
       fixtures: fixtureContext,
-      ownershipSource,
-      ownershipError,
-      pendingClaims,
+      ownershipSource: ownership.source === "league" ? "league" : "picks",
+      ownershipError: ownership.error,
+      pendingClaims: ownership.pendingClaims,
+      squadSource: fromFeed ? "league" : "marks",
+      waiver,
+      transactionMode,
       currentEvent: projections.currentEvent,
       nextEvent: projections.currentEvent + 1,
       window: projections.window,
@@ -186,6 +234,83 @@ app.post("/api/free-agents", async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ error: String(err.message || err) });
+  }
+});
+
+/**
+ * The season from the league's point of view: the table, how strong each squad
+ * is from here, and who the user still has to play. Every squad is projected
+ * the same way the user's own is, so "strength" means one thing throughout: the
+ * points a manager's best legal eleven is expected to score in a gameweek.
+ */
+app.post("/api/season-overview", async (req, res) => {
+  try {
+    const leagueId = req.body?.leagueId;
+    if (!leagueId) return res.status(400).json({ error: "leagueId required" });
+
+    const details = await getLeagueDetails(leagueId);
+    const entries = details?.league_entries || [];
+    // The matches and standings feeds work in league_entry ids, while ownership
+    // and picks work in entry_ids, so squads are rekeyed once, here.
+    const leagueEntryFor = (entryId) => {
+      const entry = entries.find((e) => String(e.entry_id) === String(entryId));
+      return entry ? entry.id : null;
+    };
+
+    const squads = new Map();
+    const ownership = await readOwnership(leagueId);
+    let ownershipSource = ownership.source;
+    const ownershipError = ownership.error;
+    for (const [entryId, elements] of ownership.byEntry) {
+      const key = leagueEntryFor(entryId);
+      if (key !== null) squads.set(key, elements);
+    }
+    if (!squads.size && req.body?.squadsByEntryId) {
+      for (const [entryId, elements] of Object.entries(req.body.squadsByEntryId)) {
+        const key = leagueEntryFor(entryId);
+        if (key !== null) squads.set(key, elementIds(elements));
+      }
+      if (squads.size) ownershipSource = "picks";
+    }
+
+    const { source, projections } = await projectSeason(req.body?.window);
+    const byId = new Map(projections.players.map((p) => [p.id, p]));
+    const strengths = {};
+    for (const [owner, elements] of squads) {
+      const lineup = pickLineup(elements.map((id) => byId.get(id)).filter(Boolean));
+      if (lineup.playable) strengths[owner] = lineup.expected;
+    }
+
+    const overview = buildSeasonOverview({
+      entries,
+      standings: details?.standings || [],
+      matches: details?.matches || [],
+      strengths,
+      myEntryId: Number(req.body?.myEntryId) || null,
+      fromEvent: projections.currentEvent + 1,
+      upcoming: Math.min(Math.max(Number(req.body?.upcoming) || 5, 1), 38),
+    });
+
+    // Some leagues hold a second draft mid-season, which changes how much the
+    // rest of the season is worth planning for.
+    const nextDraft = (details?.league?.drafts || [])
+      .filter((d) => !d.draft_completed && Number(d.event) > projections.currentEvent)
+      .sort((a, b) => Number(a.event) - Number(b.event))[0];
+
+    res.json({
+      source,
+      leagueName: details?.league?.name || "",
+      transactionMode: details?.league?.transaction_mode || "",
+      nextDraft: nextDraft ? { event: Number(nextDraft.event), at: nextDraft.draft_dt || "" } : null,
+      ownershipSource,
+      ownershipError,
+      currentEvent: projections.currentEvent,
+      nextEvent: projections.currentEvent + 1,
+      window: projections.window,
+      ...overview,
+    });
+  } catch (err) {
+    res.status(502).json({ error: String(err.message || err) });
   }
 });
 

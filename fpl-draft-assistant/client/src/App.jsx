@@ -10,6 +10,7 @@ import CheatSheet from "./components/CheatSheet.jsx";
 import SyncStatus from "./components/SyncStatus.jsx";
 import MyWeek from "./components/MyWeek.jsx";
 import FreeAgents from "./components/FreeAgents.jsx";
+import SeasonView from "./components/SeasonView.jsx";
 
 const SQUAD_LIMITS = { GKP: 2, DEF: 5, MID: 5, FWD: 3 };
 const POLL_MS = 10000;
@@ -180,9 +181,11 @@ export default function App() {
   );
 
   // ---- Head to head ----
-  // Rival squads come from the draft picks, which is what the app can see
-  // without an authenticated session, so they are a draft-day snapshot.
   const nextEvent = currentEvent + 1;
+  // The draft can be finished well before gameweek 1, and once it is, the app
+  // is a season tool rather than a draft tool. The league says so itself, so do
+  // not wait for a gameweek to be played before switching the framing.
+  const seasonMode = currentEvent > 0 || league?.league?.draft_status === "post";
   const myLeagueEntry = useMemo(
     () => entries.find((e) => e.entry_id === myEntryId || e.id === myEntryId) || null,
     [entries, myEntryId]
@@ -210,6 +213,9 @@ export default function App() {
     const standing = (league.standings || []).find((s) => s.league_entry === otherId);
     return {
       name: entry.entry_name || `${entry.player_first_name} ${entry.player_last_name}`.trim(),
+      // The ownership feed keys squads by entry_id, so the server needs that
+      // rather than the league_entry id the matches feed gave us.
+      entryId: entry.entry_id,
       elements: squadsByEntry[entry.entry_id] || [],
       record: standing
         ? `Ranked ${ordinal(standing.rank)} on ${standing.total} league points with ${standing.points_for} scored`
@@ -249,12 +255,12 @@ export default function App() {
       bestAvailable: best,
       recentPicks: recent,
       dataSource,
-      // Once the season starts the questions change, so tell Nova where we are.
-      gameweek: currentEvent > 0 ? nextEvent : null,
+      // Once the draft is done the questions change, so tell Nova where we are.
+      gameweek: seasonMode ? nextEvent : null,
       opponent: opponent?.name || null,
       opponentSquad,
     };
-  }, [available, myRoster, livePicks, players, entryName, dataSource, currentEvent, nextEvent, opponent]);
+  }, [available, myRoster, livePicks, players, entryName, dataSource, seasonMode, nextEvent, opponent]);
 
   const onSetLeague = (id) => {
     setLeagueId(id);
@@ -280,6 +286,7 @@ export default function App() {
       <nav className="tabs" role="tablist">
         {[
           ["week", "My week"],
+          ["season", "Season"],
           ["agents", "Free agents"],
           ["board", "Draft board"],
           ["best", "Best available"],
@@ -307,7 +314,7 @@ export default function App() {
           error={sync.error}
           picks={sync.picks}
           onSyncNow={syncNow}
-          inSeason={currentEvent > 0}
+          inSeason={seasonMode}
         />
       )}
 
@@ -321,10 +328,24 @@ export default function App() {
             myName={myLeagueEntry?.entry_name || "Your team"}
             nextEvent={nextEvent}
             leagueConnected={Boolean(league)}
+            leagueId={leagueId}
+            myEntryId={myEntryId}
+          />
+        )}
+        {tab === "season" && (
+          <SeasonView
+            leagueId={leagueId}
+            myLeagueEntryId={myLeagueEntry?.id || null}
+            squadsByEntryId={squadsByEntry}
           />
         )}
         {tab === "agents" && (
-          <FreeAgents leagueId={leagueId} myElements={myElements} ownedElements={ownedElements} />
+          <FreeAgents
+            leagueId={leagueId}
+            myEntryId={myEntryId}
+            myElements={myElements}
+            ownedElements={ownedElements}
+          />
         )}
         {tab === "board" && (
           <DraftBoard

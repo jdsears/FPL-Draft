@@ -441,6 +441,26 @@ table.board { width: 100%; border-collapse: collapse; background: var(--panel); 
 }
 .week-tag-gain { background: rgba(0, 255, 135, 0.12); color: var(--accent); }
 
+/* Season view: results, squad strength and the run of opponents left */
+.form-run { display: inline-flex; gap: 3px; }
+.form-chip {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 20px; padding: 2px 4px; border-radius: 5px;
+  font-size: 12px; font-weight: 700; line-height: 1.3;
+}
+.form-W { background: var(--fdr-1-bg); color: var(--fdr-1-fg); }
+.form-D { background: var(--fdr-3-bg); color: var(--fdr-3-fg); }
+.form-L { background: var(--fdr-5-bg); color: var(--fdr-5-fg); }
+.show-sm { display: none; }
+.form-inline { margin-top: 4px; }
+/* The name, the manager and the form each want their own line. */
+.team-cell > span { display: block; }
+.team-cell .form-run { display: inline-flex; }
+/* Not a button, so it does not want the tappable affordance. */
+.sos-row { cursor: default; }
+.sos-row.sos-hard { border-left: 3px solid var(--danger); }
+.sos-row.sos-easy { border-left: 3px solid var(--accent); }
+
 /* Banners */
 .banner {
   padding: 10px 14px; border-radius: 10px; margin: 10px 0; font-size: 14px;
@@ -452,6 +472,7 @@ table.board { width: 100%; border-collapse: collapse; background: var(--panel); 
   .best-grid, .roster, .cheat-grid { grid-template-columns: repeat(2, 1fr); }
   .cheat-first-list { columns: 2; }
   .hide-sm { display: none; }
+  .show-sm { display: flex; }
   .board th, .board td { padding: 8px 8px; }
   .controls { gap: 6px; }
   .chat { height: calc(100dvh - 210px); }

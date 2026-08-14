@@ -43,7 +43,7 @@ function AgentRow({ player, run, expanded, onToggle }) {
   );
 }
 
-export default function FreeAgents({ leagueId, myElements, ownedElements }) {
+export default function FreeAgents({ leagueId, myEntryId, myElements, ownedElements }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -58,13 +58,14 @@ export default function FreeAgents({ leagueId, myElements, ownedElements }) {
     setError("");
     fetchFreeAgents({
       leagueId: leagueId || null,
+      myEntryId: myEntryId || null,
       elements: mineKey ? mineKey.split(",").map(Number) : [],
       ownedElements: ownedKey ? ownedKey.split(",").map(Number) : [],
     })
       .then(setData)
       .catch((e) => setError(String(e.message || e)))
       .finally(() => setLoading(false));
-  }, [leagueId, mineKey, ownedKey]);
+  }, [leagueId, myEntryId, mineKey, ownedKey]);
 
   useEffect(load, [load]);
 
@@ -103,6 +104,17 @@ export default function FreeAgents({ leagueId, myElements, ownedElements }) {
             ? "Ownership is taken from the draft rather than the live league feed, so any waiver moves since are not reflected."
             : "Connect your league on the League tab for live ownership. For now this uses the players marked as taken."}
           {data.ownershipError ? ` (${data.ownershipError})` : ""}
+        </p>
+      )}
+      {data?.waiver && (
+        <p className="pmeta">
+          {data.transactionMode === "waivers"
+            ? `Your waiver pick is ${data.waiver.pick} of ${data.waiver.of}, so ${
+                data.waiver.pick === 1
+                  ? "you get first refusal on any claim"
+                  : `${data.waiver.pick - 1} manager${data.waiver.pick === 2 ? "" : "s"} get first refusal ahead of you`
+              }.`
+            : `Your waiver pick is ${data.waiver.pick} of ${data.waiver.of}.`}
         </p>
       )}
       {data?.pendingClaims > 0 && (
