@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { fetchMyWeek, sendChat } from "../api.js";
 import FixtureRun from "./FixtureRun.jsx";
+import Pitch from "./Pitch.jsx";
+import WeekActions from "./WeekActions.jsx";
 
 // The weekly decision. Captains are disabled in this league, so the only lever
 // each gameweek is which eleven of the fifteen start, and the only thing that
@@ -83,31 +85,6 @@ function PlayerLine({ player, run, note, expanded, onToggle }) {
   );
 }
 
-function Scoreline({ lineup, opponent, myName, opponentName }) {
-  if (!opponent) return null;
-  const mine = lineup?.expected || 0;
-  const theirs = opponent.expected || 0;
-  const margin = Math.round((mine - theirs) * 10) / 10;
-  const verdict =
-    Math.abs(margin) < 3
-      ? "Too close to call, so every starting choice counts"
-      : margin > 0
-        ? `Projected to win by about ${Math.abs(margin).toFixed(1)}`
-        : `Projected to lose by about ${Math.abs(margin).toFixed(1)}`;
-  return (
-    <div className="card week-score">
-      <div className="week-score-line">
-        <span className="week-score-team">{myName}</span>
-        <span className="week-score-value">{mine.toFixed(1)}</span>
-        <span className="week-score-sep">vs</span>
-        <span className="week-score-value">{theirs.toFixed(1)}</span>
-        <span className="week-score-team">{opponentName}</span>
-      </div>
-      <p className="pmeta">{verdict}. Projections are expected points, not a prediction of the result.</p>
-    </div>
-  );
-}
-
 export default function MyWeek({
   elements,
   opponent,
@@ -122,6 +99,7 @@ export default function MyWeek({
   onNotes,
   onForgetNote,
   chatContext,
+  agents,
 }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
@@ -222,62 +200,80 @@ export default function MyWeek({
 
   const lineup = data?.lineup;
   const event = data?.nextEvent || nextEvent;
-  const warnings = lineup?.warnings || [];
-  const startersByPosition = ORDER.map((pos) => [pos, (lineup?.starters || []).filter((p) => p.position === pos)]);
+  const footnotes = [];
+  if (data?.source === "sample") footnotes.push("These are demo numbers, because live FPL data is unreachable.");
+  if (data && !data.fixturesAvailable) {
+    footnotes.push("Fixtures are unavailable, so everyone is projected on a neutral run.");
+  }
+  if (data?.unknown > 0) {
+    footnotes.push(`${data.unknown} marked player${data.unknown === 1 ? " is" : "s are"} not in the current player list, so they are left out.`);
+  }
+  if (data?.corrections) {
+    footnotes.push("Projections are corrected using how past gameweeks turned out; the Season tab shows by how much.");
+  }
+  if (data?.window === 1) footnotes.push("Numbers are for this gameweek alone, not an average.");
+
+  const expandedPlayer = expanded
+    ? [...(lineup?.starters || []), ...(lineup?.bench || [])].find((p) => p.id === expanded)
+    : null;
 
   return (
     <section className="week">
-      <div className="card week-head">
-        <div>
-          <h3>Gameweek {event || "next"}</h3>
-          <p className="pmeta">
-            {lineup?.playable
-              ? `Best legal eleven, ${lineup.label}, projected ${lineup.expected.toFixed(1)} points`
-              : loading
-                ? "Working out your best eleven"
-                : "Not enough of your squad is known to field a legal eleven"}
-          </p>
+      <div className="card week-hero">
+        <div className="hero-top">
+          <div>
+            <span className="hero-eyebrow">Gameweek {event || "next"}</span>
+            <h2 className="hero-title">
+              {lineup?.playable
+                ? `Start these eleven in ${lineup.label}`
+                : loading
+                  ? "Working out your best eleven"
+                  : "Not enough of your squad is known"}
+            </h2>
+          </div>
+          <button className="chip subtle" onClick={load} disabled={loading}>
+            {loading ? "Updating" : "Refresh"}
+          </button>
         </div>
-        <button className="chip subtle" onClick={load} disabled={loading}>
-          {loading ? "Updating" : "Refresh"}
-        </button>
+
+        {data?.opponent ? (
+          <div className="scoreboard">
+            <div className="scoreboard-side">
+              <span className="scoreboard-team">{myName || "Your team"}</span>
+              <span className="scoreboard-value">{lineup ? lineup.expected.toFixed(1) : "0.0"}</span>
+            </div>
+            <span className="scoreboard-sep">projected</span>
+            <div className="scoreboard-side scoreboard-them">
+              <span className="scoreboard-team">{opponent?.name || "Opponent"}</span>
+              <span className="scoreboard-value">{data.opponent.expected.toFixed(1)}</span>
+            </div>
+          </div>
+        ) : (
+          lineup?.playable && (
+            <div className="scoreboard scoreboard-solo">
+              <div className="scoreboard-side">
+                <span className="scoreboard-team">Projected this gameweek</span>
+                <span className="scoreboard-value">{lineup.expected.toFixed(1)}</span>
+              </div>
+            </div>
+          )
+        )}
+
+        <WeekActions week={data} agents={agents} notes={notes} />
       </div>
 
-      {data?.deadline && <p className="pmeta week-deadline">{deadlineLine(data.deadline)}</p>}
-      {data?.corrections && (
-        <p className="pmeta">
-          These projections have been corrected using how past gameweeks actually turned out. The Season tab
-          shows by how much.
-        </p>
-      )}
-
       {error && <div className="banner error">Could not project this week: {error}</div>}
-      {data?.source === "sample" && (
-        <p className="pmeta">These are demo numbers, because live FPL data is unreachable.</p>
-      )}
-      {data && !data.fixturesAvailable && (
-        <p className="pmeta">
-          Fixtures are unavailable, so every player is projected on a neutral run rather than who they face.
-        </p>
-      )}
-      {data?.unknown > 0 && (
-        <p className="pmeta">
-          {data.unknown} of your marked players are not in the current player list, so they are left out.
-        </p>
-      )}
 
-      <Scoreline
-        lineup={lineup}
-        opponent={data?.opponent}
-        myName={myName || "Your team"}
-        opponentName={opponent?.name || "Opponent"}
-      />
-
-      {!opponent && (
-        <p className="pmeta">
-          {leagueConnected
-            ? "No head-to-head fixture found for this gameweek, so this is your eleven on its own."
-            : "Connect your league on the League tab to see who you play and how your eleven compares."}
+      {/* Everything that qualifies the numbers, in one place rather than
+          scattered between the cards that use them. */}
+      {(footnotes.length > 0 || !opponent) && (
+        <p className="pmeta week-footnotes">
+          {!opponent
+            ? leagueConnected
+              ? "No head-to-head fixture this gameweek, so this is your eleven on its own. "
+              : "Connect your league on the League tab to see who you play. "
+            : ""}
+          {footnotes.join(" ")}
         </p>
       )}
 
@@ -326,41 +322,30 @@ export default function MyWeek({
         ))}
       </div>
 
-      {warnings.length > 0 && (
-        <div className="card week-warnings">
-          <h3>Check before you confirm</h3>
-          <ul>
-            {warnings.map((w, i) => (
-              <li key={`${w.kind}-${w.id || i}`}>
-                <span className={`week-tag week-tag-${w.kind}`}>{WARNING_TITLES[w.kind] || w.kind}</span>
-                {w.name ? <b>{w.name}</b> : null} {w.detail}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
       {lineup?.playable && (
         <div className="card week-lineup">
-          <h3>Start these eleven</h3>
-          {startersByPosition.map(([pos, group]) =>
-            group.length ? (
-              <div key={pos} className="week-block">
-                <div className="week-block-head">
-                  {POSITION_NAMES[pos]} <span className="pmeta">{group.length}</span>
+          <Pitch starters={lineup.starters} label={lineup.label} expanded={expanded} onToggle={toggle}>
+            {expandedPlayer && (
+              <div className="pitch-detail">
+                <div className="pitch-detail-head">
+                  <span className={`pos pos-${expandedPlayer.position}`}>{expandedPlayer.position}</span>
+                  <b>{expandedPlayer.name}</b>
+                  <span className="pmeta">{expandedPlayer.teamName || expandedPlayer.teamShort}</span>
+                  <FixtureRun run={runFor(expandedPlayer)} labelled />
                 </div>
-                {group.map((p) => (
-                  <PlayerLine
-                    key={p.id}
-                    player={p}
-                    run={runFor(p)}
-                    expanded={expanded === p.id}
-                    onToggle={toggle}
-                  />
+                <p className="pmeta">{expandedPlayer.season?.summary}</p>
+                {(expandedPlayer.notes || []).map((note) => (
+                  <p key={note.id} className="pmeta pitch-detail-note">
+                    {note.label}
+                    {note.detail ? `: ${note.detail}` : ""} ({note.source === "search" ? "Nova found this" : "you said this"})
+                  </p>
                 ))}
               </div>
-            ) : null
-          )}
+            )}
+          </Pitch>
+          <p className="pmeta pitch-hint">
+            Tap a player for the reasoning. A dot marks somebody worth checking before you confirm.
+          </p>
         </div>
       )}
 

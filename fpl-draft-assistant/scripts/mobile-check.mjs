@@ -215,7 +215,7 @@ for (const width of WIDTHS) {
     [
       "chat",
       async () => {
-        if (!(await openTab("AI assistant"))) return "skip";
+        if (!(await openTab("Nova", "AI assistant"))) return "skip";
         await page.waitForSelector(".chat");
         await page.locator(".chat-input input").fill("Any transfer news I should know?");
         await page.locator(".chat-input button").click();

@@ -31,20 +31,20 @@ function tabsFor(seasonMode, rosterSize) {
     ["season", "Season"],
     ["agents", "Free agents"],
     ["trades", "Trades"],
-    ["roster", `My team (${rosterSize}/15)`],
+    ["chat", "Nova"],
+    ["roster", `Squad ${rosterSize}/15`],
     ["fixtures", "Fixtures"],
     ["board", "Players"],
     ["league", "League"],
-    ["chat", "AI assistant"],
   ];
   const draft = [
     ["board", "Draft board"],
     ["best", "Best available"],
+    ["chat", "Nova"],
     ["fixtures", "Fixtures"],
-    ["roster", `My team (${rosterSize}/15)`],
+    ["roster", `Squad ${rosterSize}/15`],
     ["league", "League"],
     ["cheat", "Cheat sheet"],
-    ["chat", "AI assistant"],
     ["week", "My week"],
   ];
   return seasonMode ? season : draft;
@@ -459,6 +459,7 @@ export default function App() {
         {dataSource === "live" && <span className="pill pill-ok">Live FPL data</span>}
       </header>
 
+      <div className="tab-strip">
       <nav className="tabs" role="tablist">
         {tabs.map(([key, label]) => (
           <button
@@ -472,6 +473,7 @@ export default function App() {
           </button>
         ))}
       </nav>
+      </div>
 
       {leagueId && league && (
         <SyncStatus
@@ -501,6 +503,7 @@ export default function App() {
             onForgetNote={onForgetNote}
             onNotes={onNotes}
             chatContext={chatContext}
+            agents={agents}
           />
         )}
         {tab === "season" && (
