@@ -156,6 +156,9 @@ app.post("/api/my-week", async (req, res) => {
       fixturesSource,
       fixtures: fixtureContext,
       squadSource: me.fromFeed ? "league" : "marks",
+      // Which source the opponent's squad came from, so the interface can say
+      // whether their waivers and trades are included rather than guessing.
+      opponentSquadSource: them.elements.size ? (them.fromFeed ? "league" : "picks") : null,
       ownershipError: ownership.error,
       deadline,
       corrections: projections.corrections,

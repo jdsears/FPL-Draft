@@ -344,10 +344,15 @@ export default function App() {
         return pl ? `${pl.name} to ${entryName(p.entryId) || "a rival"}` : null;
       })
       .filter(Boolean);
-    const opponentSquad = (opponent?.elements || [])
-      .map((id) => players.find((p) => p.id === id))
-      .filter(Boolean)
-      .map((p) => `${p.name} (${p.position})`);
+    // Prefer the live squad the server read from the league, which includes
+    // waivers and trades; the draft picks are only the fallback.
+    const liveOpponent = week?.opponent ? [...week.opponent.starters, ...week.opponent.bench] : null;
+    const opponentSquad = liveOpponent
+      ? liveOpponent.map((p) => `${p.name} (${p.position})`)
+      : (opponent?.elements || [])
+          .map((id) => players.find((p) => p.id === id))
+          .filter(Boolean)
+          .map((p) => `${p.name} (${p.position})`);
     return {
       myRoster: myRoster.map((p) => `${p.name} (${p.position})`),
       bestAvailable: best,

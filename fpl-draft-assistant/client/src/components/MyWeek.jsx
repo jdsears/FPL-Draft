@@ -406,8 +406,10 @@ export default function MyWeek({
               <h3>{opponent?.name || "Opponent"}</h3>
               <p className="pmeta">
                 Their likely eleven, {data.opponent.label}, projected {data.opponent.expected.toFixed(1)}
-                {opponent?.record ? `. ${opponent.record}` : ""}. Their squad is taken from the draft, so any
-                waiver moves since are not reflected.
+                {opponent?.record ? `. ${opponent.record}` : ""}.{" "}
+                {data.opponentSquadSource === "league"
+                  ? "Their squad is read live from the league, so waivers and trades are included."
+                  : "Their squad is from the draft, because the live ownership feed could not be read."}
               </p>
             </div>
             <button className="chip subtle" onClick={() => setShowOpponent((v) => !v)} aria-expanded={showOpponent}>
