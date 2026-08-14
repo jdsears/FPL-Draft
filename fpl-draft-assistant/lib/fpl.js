@@ -35,6 +35,37 @@ function readSample() {
   return JSON.parse(fs.readFileSync(samplePath, "utf8"));
 }
 
+// FPL wipes last season's totals once the new season is under way, which leaves
+// the in-season model with nothing to lean on for the first few gameweeks. So
+// the last pre-season bootstrap is snapshotted while those numbers still exist.
+const BASELINE_PATH = path.join(__dirname, "baseline.json");
+
+export function readBaseline() {
+  try {
+    return JSON.parse(fs.readFileSync(BASELINE_PATH, "utf8"));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Write the snapshot the first time live pre-season data is seen. Best effort:
+ * a read-only or ephemeral filesystem just means the prior is unavailable, and
+ * the model says so rather than failing.
+ */
+export function captureBaseline(bootstrap, build) {
+  if (bootstrap?.events?.current) return null; // season already under way
+  const existing = readBaseline();
+  if (existing) return existing;
+  try {
+    const baseline = build(bootstrap);
+    fs.writeFileSync(BASELINE_PATH, JSON.stringify(baseline));
+    return baseline;
+  } catch {
+    return null;
+  }
+}
+
 export async function getBootstrap() {
   try {
     // Player pool changes rarely; cache for 5 minutes.

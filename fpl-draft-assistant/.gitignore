@@ -3,3 +3,4 @@ client/node_modules/
 client/dist/
 screenshots/
 .DS_Store
+lib/baseline.json

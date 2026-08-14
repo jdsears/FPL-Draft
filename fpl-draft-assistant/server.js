@@ -8,9 +8,12 @@ import {
   getDraftChoices,
   getElementStatus,
   getGameStatus,
+  readBaseline,
+  captureBaseline,
 } from "./lib/fpl.js";
 import { buildRankings } from "./lib/rankings.js";
 import { buildFixtureContext } from "./lib/fixtures.js";
+import { buildSeasonProjections, buildBaseline, PLANNING_WINDOW } from "./lib/season.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -41,6 +44,33 @@ app.get("/api/bootstrap", async (_req, res) => {
       fixtures: rankings.fixturesAvailable ? fixtureContext : null,
       fixturesSource: rankings.fixturesAvailable ? main.source : "unavailable",
     });
+  } catch (err) {
+    res.status(500).json({ error: String(err.message || err) });
+  }
+});
+
+// In-season projections: expected points per gameweek over a planning window
+// that starts at the next gameweek, rather than the draft board's valuation.
+app.get("/api/season", async (req, res) => {
+  try {
+    const window = Math.min(Math.max(Number(req.query.window) || PLANNING_WINDOW, 1), 10);
+    const { data, source } = await getBootstrap();
+    if (source === "live") captureBaseline(data, buildBaseline);
+
+    const currentEvent = Number(data?.events?.current) || 0;
+    const main = await getMainGameData({ allowSample: source === "sample" });
+    const fixtureContext = buildFixtureContext(main.teams, main.fixtures, {
+      firstEvent: currentEvent + 1,
+      gameweeks: window,
+    });
+
+    const projections = buildSeasonProjections(data, {
+      fixtureContext,
+      currentEvent,
+      window,
+      baseline: readBaseline()?.players || null,
+    });
+    res.json({ source, fixturesSource: main.source, fixtures: fixtureContext, ...projections });
   } catch (err) {
     res.status(500).json({ error: String(err.message || err) });
   }
