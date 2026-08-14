@@ -88,8 +88,8 @@ function describe(player) {
   }
 
   if (b.availabilityFactor < 1) parts.push("carrying a flag, so check the news");
-  if (b.intelFactor < 1) parts.push("marked down on team news");
-  else if (b.intelFactor > 1) parts.push("marked up on team news");
+  if (b.intelShift === "down") parts.push("marked down on team news");
+  else if (b.intelShift === "up") parts.push("marked up on team news");
 
   return `Expected ${round1(b.perGameweek)} a gameweek: ${parts.join(", ")}.`;
 }
@@ -159,13 +159,24 @@ export function buildSeasonProjections(bootstrap, options = {}) {
     const fixtureFactor = seasonFixtureFactor(fixtureAverage);
     const availability = availabilityFactor(e.status, e.chance_of_playing_this_round, e.news);
 
-    // Team news the model cannot read: a doubt, a suspension, a manager saying
-    // somebody is rested. Bounded, so it tilts a decision rather than making it.
+    // Team news the model cannot read: a doubt, a suspension, a manager naming
+    // his starter. Selection news overrides the history on playing time, since
+    // "he is our striker" from the manager outweighs last season's minutes; the
+    // rate factors stay bounded so news tilts the rate rather than setting it.
     const news = intel?.[e.id] || null;
     const newsFactor = Number(news?.factor) || 1;
+    let effectivePlay = playProbability;
+    if (news && Number.isFinite(news.playFloor)) effectivePlay = Math.max(effectivePlay, news.playFloor);
+    if (news && Number.isFinite(news.playCap)) effectivePlay = Math.min(effectivePlay, news.playCap);
+    const intelShift =
+      newsFactor < 1 || effectivePlay < playProbability
+        ? "down"
+        : newsFactor > 1 || effectivePlay > playProbability
+          ? "up"
+          : null;
 
     const perPlayedFixture = perFixture * fixtureFactor * availability * correction * newsFactor;
-    const windowPoints = perPlayedFixture * playProbability * fixtures;
+    const windowPoints = perPlayedFixture * effectivePlay * fixtures;
 
     const player = {
       id: e.id,
@@ -191,7 +202,8 @@ export function buildSeasonProjections(bootstrap, options = {}) {
         fixtureAverage,
         fixtureFactor: round2(fixtureFactor),
         availabilityFactor: round2(availability),
-        playProbability: round2(playProbability),
+        playProbability: round2(effectivePlay),
+        historyPlayProbability: round2(playProbability),
         appearances,
         pointsPerGame: ppg,
         form,
@@ -199,6 +211,7 @@ export function buildSeasonProjections(bootstrap, options = {}) {
         preSeason,
         correction: round2(correction),
         intelFactor: round2(newsFactor),
+        intelShift,
         summary: "",
       },
     };

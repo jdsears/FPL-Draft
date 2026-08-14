@@ -102,11 +102,35 @@ test("bad news pulls a projection down, and the strongest kinds nearly zero it",
 });
 
 test("confidence decides how far a note moves the number", () => {
-  const factor = (confidence) => buildAdjustments([note({ kind: "benched", confidence })], 6)[1].factor;
+  const factor = (confidence) => buildAdjustments([note({ kind: "doubt", confidence })], 6)[1].factor;
   assert.ok(factor("low") > factor("medium"));
   assert.ok(factor("medium") > factor("high"));
   assert.ok(factor("low") < 1, "even a soft claim counts for something");
   assert.equal(factor("nonsense"), factor("medium"), "an unrecognised confidence is treated as medium");
+});
+
+test("selection news acts on playing time, not the scoring rate", () => {
+  // The manager naming his starter overrides last season's minutes.
+  const starter = buildAdjustments([note({ kind: "starting", confidence: "high" })], 6)[1];
+  assert.equal(starter.playFloor, 0.92, "a named starter plays, whatever the history said");
+  assert.equal(starter.playCap, null);
+
+  // And a rumour lifts less far than a team sheet.
+  const rumour = buildAdjustments([note({ kind: "starting", confidence: "low" })], 6)[1];
+  assert.ok(rumour.playFloor < starter.playFloor);
+  assert.ok(rumour.playFloor > 0.3);
+
+  // The other direction: fit, but not expected to start.
+  const benched = buildAdjustments([note({ kind: "benched", confidence: "high" })], 6)[1];
+  assert.equal(benched.playCap, 0.15);
+  assert.equal(benched.playFloor, null);
+  const maybeBenched = buildAdjustments([note({ kind: "benched", confidence: "low" })], 6)[1];
+  assert.ok(maybeBenched.playCap > benched.playCap, "a rumoured benching caps less brutally");
+
+  // A note with no selection claim leaves playing time alone.
+  const pens = buildAdjustments([note({ kind: "penalties" })], 6)[1];
+  assert.equal(pens.playFloor, null);
+  assert.equal(pens.playCap, null);
 });
 
 test("two reasons to worry compound, two reasons to like do not", () => {

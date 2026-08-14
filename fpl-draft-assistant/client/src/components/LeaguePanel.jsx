@@ -1,5 +1,38 @@
 import React, { useState } from "react";
 
+/** The address of this deployment with the league setup baked in. */
+function setupLink(leagueId, myEntryId) {
+  const base = `${window.location.origin}${window.location.pathname}`;
+  return `${base}?league=${encodeURIComponent(leagueId)}${myEntryId ? `&entry=${myEntryId}` : ""}`;
+}
+
+/** One tap to put the setup link on the clipboard, for sending to a phone. */
+function ShareSetup({ leagueId, myEntryId }) {
+  const [message, setMessage] = useState("");
+  if (!leagueId) return null;
+  const link = setupLink(leagueId, myEntryId);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(link);
+      setMessage("Copied. Open it on your phone and that browser is set up too.");
+    } catch {
+      setMessage(link);
+    }
+  };
+  return (
+    <div className="setup-share">
+      <p className="pmeta">
+        This connection lives in this browser only, so a phone or another laptop starts unconnected. Send
+        yourself this link and opening it sets the device up in one tap.
+      </p>
+      <button className="chip subtle" onClick={copy}>
+        Copy setup link
+      </button>
+      {message && <p className="pmeta setup-link">{message}</p>}
+    </div>
+  );
+}
+
 export default function LeaguePanel({ leagueId, league, leagueError, myEntryId, onSetLeague, onSetEntry }) {
   const [draftId, setDraftId] = useState(leagueId || "");
   const entries = league?.league_entries || [];
@@ -37,6 +70,7 @@ export default function LeaguePanel({ leagueId, league, leagueError, myEntryId, 
             Connected to <b>{league.league?.name}</b>. Draft picks will sync automatically while the draft runs.
           </p>
         )}
+        {league && <ShareSetup leagueId={leagueId} myEntryId={myEntryId} />}
       </div>
 
       {entries.length > 0 && (

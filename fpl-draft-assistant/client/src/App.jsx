@@ -78,6 +78,19 @@ function ordinal(n) {
   return `${value}${["th", "st", "nd", "rd"][value % 10] || "th"}`;
 }
 
+// A link can carry the league setup, because localStorage does not follow the
+// user between devices: a phone that has never been told the league would
+// otherwise sit in draft mode looking out of date.
+function setupFromUrl() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    return { league: params.get("league") || "", entry: Number(params.get("entry")) || null };
+  } catch {
+    return { league: "", entry: null };
+  }
+}
+const FROM_URL = setupFromUrl();
+
 function load(key, fallback) {
   try {
     const v = localStorage.getItem(key);
@@ -102,10 +115,10 @@ export default function App() {
   const [departedExcluded, setDepartedExcluded] = useState(0);
   const [currentEvent, setCurrentEvent] = useState(0);
 
-  const [leagueId, setLeagueId] = useState(() => load("fplda.leagueId", ""));
+  const [leagueId, setLeagueId] = useState(() => FROM_URL.league || load("fplda.leagueId", ""));
   const [league, setLeague] = useState(null);
   const [leagueError, setLeagueError] = useState("");
-  const [myEntryId, setMyEntryId] = useState(() => load("fplda.myEntryId", null));
+  const [myEntryId, setMyEntryId] = useState(() => FROM_URL.entry || load("fplda.myEntryId", null));
 
   // element id -> { entryId | "me" | "gone" } ; live picks + manual marks
   const [manualMarks, setManualMarks] = useState(() => load("fplda.manualMarks", {}));
@@ -151,6 +164,15 @@ export default function App() {
 
   useEffect(() => {
     if (leagueId) loadLeague(leagueId);
+    // A setup link is remembered and then tidied off the address bar, so the
+    // next visit works without it and the URL can be bookmarked clean.
+    if (FROM_URL.league) {
+      save("fplda.leagueId", FROM_URL.league);
+      if (FROM_URL.entry) save("fplda.myEntryId", FROM_URL.entry);
+      try {
+        window.history.replaceState(null, "", window.location.pathname);
+      } catch {}
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -288,9 +310,12 @@ export default function App() {
       // rather than the league_entry id the matches feed gave us.
       entryId: entry.entry_id,
       elements: squadsByEntry[entry.entry_id] || [],
-      record: standing
-        ? `Ranked ${ordinal(standing.rank)} on ${standing.total} league points with ${standing.points_for} scored`
-        : "",
+      // Before a gameweek is scored the feed carries null ranks and zero
+      // totals, which read as "Ranked 0th on 0 points". Say nothing instead.
+      record:
+        standing && Number(standing.rank) > 0
+          ? `Ranked ${ordinal(standing.rank)} on ${standing.total} league points with ${standing.points_for} scored`
+          : "",
     };
   }, [league, myLeagueEntry, entries, nextEvent, squadsByEntry]);
 

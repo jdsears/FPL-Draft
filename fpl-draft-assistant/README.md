@@ -23,6 +23,12 @@ gameweek it is.
   rivals are reflected.
 - **Trades**: every one-for-one swap with every rival, valued by re-picking both
   elevens, so you can see what a deal is worth to you and what it costs them.
+- **Team news that counts**: tell Nova what you have heard, or send her to look,
+  and she records it as a dated note that adjusts the player it is about.
+  Selection news acts on playing time rather than the scoring rate, so a manager
+  naming his starting striker overrides last season's minutes instead of nudging
+  them, and a player he has dropped falls out of the eleven. Notes expire, say
+  where they came from, and can be deleted from the Team news card.
 - **Learning**: each week the app writes down what it projected, then checks it
   against what your league actually recorded, reports how far out it was, and
   corrects itself. Shown on the Season tab.
@@ -276,6 +282,11 @@ npm run capture:baseline # snapshot last season's rates, pre-season only
 
 `npm run check:mobile` accepts `LEAGUE_ID` and `ENTRY_ID` so the head-to-head
 panel is on screen while it checks the weekly view.
+
+To set up a new device, open the League tab on a device that is already
+connected and copy the setup link. Opening it on the new device connects that
+browser in one tap; the link parameters are remembered and then tidied off the
+address bar.
 
 `npm run check:mobile` opens the app at 1280px, 390px, 375px and 360px, saves
 screenshots to `screenshots/`, and fails if the page scrolls sideways, a new

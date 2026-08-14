@@ -259,6 +259,46 @@ test("a learned correction scales a position without touching the others", () =>
   assert.equal(plain.corrections, null);
 });
 
+test("a manager naming his starter overrides last season's minutes", () => {
+  // Solanke's shape: scores well when he plays, but barely played last season,
+  // so the history alone buries him.
+  const elements = [
+    element({ id: 1, web_name: "Named", total_points: 45, points_per_game: "4.5", starts: 10 }),
+    element({ id: 2, web_name: "Displaced", total_points: 152, points_per_game: "4.0", starts: 38 }),
+  ];
+  const build = (intel) =>
+    buildSeasonProjections(bootstrap(elements, { current: null }), {
+      fixtureContext: contextFor(1, 1),
+      currentEvent: 0,
+      window: 1,
+      intel,
+    });
+
+  const before = build(null);
+  assert.ok(
+    find(before, "Displaced").season.perGameweek > find(before, "Named").season.perGameweek,
+    "on history alone the ever-present wins"
+  );
+
+  const after = build({
+    1: { factor: 1.05, playFloor: 0.92, playCap: null, notes: [] },
+    2: { factor: 0.85, playFloor: null, playCap: 0.15, notes: [] },
+  });
+  const named = find(after, "Named");
+  const displaced = find(after, "Displaced");
+  assert.ok(named.season.perGameweek > displaced.season.perGameweek, "the manager's word flips it");
+  assert.ok(
+    named.season.perGameweek > find(before, "Named").season.perGameweek * 2.5,
+    "a named starter who rarely played is transformed, not nudged"
+  );
+  assert.equal(named.season.playProbability, 0.92);
+  assert.equal(named.season.historyPlayProbability, find(before, "Named").season.playProbability);
+  assert.equal(named.season.intelShift, "up");
+  assert.equal(displaced.season.intelShift, "down");
+  assert.match(named.season.summary, /marked up on team news/);
+  assert.match(displaced.season.summary, /marked down on team news/);
+});
+
 test("empty and malformed bootstraps do not throw", () => {
   for (const input of [{}, { elements: [] }, undefined, { elements: [], teams: [] }]) {
     assert.deepEqual(buildSeasonProjections(input).players, []);

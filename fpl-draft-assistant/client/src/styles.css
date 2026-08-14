@@ -499,6 +499,11 @@ table.board { width: 100%; border-collapse: collapse; background: var(--panel); 
   font-family: inherit; font-size: 12px; resize: vertical;
 }
 
+/* The setup link, which can be long and unbreakable */
+.setup-share { margin-top: 10px; }
+.setup-share .pmeta { margin-bottom: 8px; }
+.setup-link { overflow-wrap: anywhere; }
+
 /* Banners */
 .banner {
   padding: 10px 14px; border-radius: 10px; margin: 10px 0; font-size: 14px;

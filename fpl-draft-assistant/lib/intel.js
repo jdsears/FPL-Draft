@@ -14,19 +14,26 @@
 /**
  * What a note can say, and what it does to a projection.
  *
- * factor   multiplies the player's expected points
- * life     how many gameweeks the note stays relevant for
- * The strongest kinds are near zero rather than zero, because a player ruled out
- * on Thursday does occasionally start on Saturday.
+ * factor     multiplies the player's expected points when they play
+ * playFloor  lifts how often they are expected to play, because "he is our
+ *            starting striker" from the manager outweighs last season's minutes
+ * playCap    caps it, for the same reason in the other direction
+ * life       how many gameweeks the note stays relevant for
+ *
+ * Selection news acts on playing time rather than on the scoring rate: a
+ * confirmed starter is not a slightly better player, he is a player who will
+ * actually be on the pitch, which for someone the history says rarely plays can
+ * honestly triple the number. The strongest kinds are near zero rather than
+ * zero, because a player ruled out on Thursday does occasionally start anyway.
  */
 export const INTEL_KINDS = {
   out: { label: "Ruled out", factor: 0.04, life: 1, bad: true },
   suspended: { label: "Suspended", factor: 0.02, life: 1, bad: true },
-  benched: { label: "Not expected to start", factor: 0.3, life: 1, bad: true },
+  benched: { label: "Not expected to start", factor: 0.85, playCap: 0.15, life: 1, bad: true },
   doubt: { label: "Fitness doubt", factor: 0.6, life: 1, bad: true },
-  rotation: { label: "Rotation risk", factor: 0.75, life: 1, bad: true },
-  starting: { label: "Expected to start", factor: 1.1, life: 1 },
-  returning: { label: "Back in training", factor: 1.15, life: 2 },
+  rotation: { label: "Rotation risk", factor: 0.9, playCap: 0.65, life: 1, bad: true },
+  starting: { label: "Expected to start", factor: 1.05, playFloor: 0.92, life: 1 },
+  returning: { label: "Back in training", factor: 1.02, playFloor: 0.6, life: 2 },
   penalties: { label: "On penalties", factor: 1.12, life: 8 },
   setpieces: { label: "On set pieces", factor: 1.06, life: 8 },
   form: { label: "In form", factor: 1.05, life: 3 },
@@ -162,9 +169,16 @@ export function buildAdjustments(notes, event) {
     const weight = CONFIDENCE[note.confidence] ?? CONFIDENCE.medium;
     // A low-confidence claim moves the factor part of the way from neutral.
     const factor = 1 + (spec.factor - 1) * weight;
-    const entry = byPlayer.get(note.playerId) || { factor: 1, best: 1, notes: [] };
+    const entry = byPlayer.get(note.playerId) || { factor: 1, best: 1, floor: null, cap: null, notes: [] };
     if (spec.bad) entry.factor *= factor;
     else entry.best = Math.max(entry.best, factor);
+    if (Number.isFinite(spec.playFloor)) {
+      // A soft claim lifts less far: a rumoured starter is not a named one.
+      entry.floor = Math.max(entry.floor ?? 0, spec.playFloor * weight);
+    }
+    if (Number.isFinite(spec.playCap)) {
+      entry.cap = Math.min(entry.cap ?? 1, 1 - (1 - spec.playCap) * weight);
+    }
     entry.notes.push(note);
     byPlayer.set(note.playerId, entry);
   }
@@ -174,6 +188,11 @@ export function buildAdjustments(notes, event) {
     const combined = clamp(entry.factor * entry.best, MIN_FACTOR, MAX_BOOST);
     adjustments[playerId] = {
       factor: round2(combined),
+      // Selection news, applied to playing time rather than the rate. Bad news
+      // wins a contradiction: a cap beats a floor because being left out is the
+      // more recent kind of certainty a manager expresses.
+      playFloor: entry.floor === null ? null : round2(entry.floor),
+      playCap: entry.cap === null ? null : round2(entry.cap),
       notes: entry.notes,
       // The worst news is what a lineup screen needs to shout about.
       headline: entry.notes.slice().sort((a, b) => spread(a) - spread(b))[0] || null,

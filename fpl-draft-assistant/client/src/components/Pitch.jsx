@@ -72,7 +72,7 @@ function alarm(player) {
   if (status === "s" || kind === "suspended") return "out";
   if (player.season?.fixtures === 0) return "out";
   if (status === "d" || ["doubt", "benched", "rotation"].includes(kind)) return "doubt";
-  if ((player.season?.intelFactor ?? 1) > 1) return "good";
+  if (player.season?.intelShift === "up") return "good";
   return null;
 }
 
