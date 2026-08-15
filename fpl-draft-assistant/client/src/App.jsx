@@ -346,15 +346,18 @@ export default function App() {
       .filter(Boolean);
     // Prefer the live squad the server read from the league, which includes
     // waivers and trades; the draft picks are only the fallback.
+    // Every squad list carries the club, because Nova's sense of who plays
+    // where predates the last transfer window and the feed's word is final.
+    const describe = (p) => `${p.name} (${p.teamShort}, ${p.position})`;
     const liveOpponent = week?.opponent ? [...week.opponent.starters, ...week.opponent.bench] : null;
     const opponentSquad = liveOpponent
-      ? liveOpponent.map((p) => `${p.name} (${p.position})`)
+      ? liveOpponent.map(describe)
       : (opponent?.elements || [])
           .map((id) => players.find((p) => p.id === id))
           .filter(Boolean)
-          .map((p) => `${p.name} (${p.position})`);
+          .map(describe);
     return {
-      myRoster: myRoster.map((p) => `${p.name} (${p.position})`),
+      myRoster: myRoster.map(describe),
       bestAvailable: best,
       recentPicks: recent,
       dataSource,
@@ -369,11 +372,11 @@ export default function App() {
       // rederiving them from a player list.
       lineup: week?.lineup?.playable
         ? week.lineup.starters
-            .map((p) => `${p.name} (${p.position}, ${Number(p.season?.perGameweek || 0).toFixed(1)})`)
+            .map((p) => `${p.name} (${p.teamShort}, ${p.position}, ${Number(p.season?.perGameweek || 0).toFixed(1)})`)
             .join(", ")
         : null,
       bench: week?.lineup?.bench?.length
-        ? week.lineup.bench.map((p) => `${p.name} (${p.position})`).join(", ")
+        ? week.lineup.bench.map(describe).join(", ")
         : null,
       projection: week?.lineup?.playable
         ? `your eleven ${week.lineup.expected.toFixed(1)} in ${week.lineup.label}` +

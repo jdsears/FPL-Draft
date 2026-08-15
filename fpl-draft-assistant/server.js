@@ -711,6 +711,9 @@ function buildSystemPrompt(context, { webSearch = false, notes = [] } = {}) {
     "Answer briefly and decisively. When asked to choose, give a clear first choice plus one alternative, with a one-line reason each.",
     "Use British English. Never use em dashes.",
     "You may format with simple Markdown: bold for a player's name or a verdict, and short bullet lists where you are comparing options. No headings, no tables, no nested lists.",
+    // Her training memory ends before the most recent transfer window, which
+    // once had her recording that the app had a player at the wrong club.
+    "Every club shown next to a player in this prompt comes from the live FPL feed, which is definitive. Your own memory of who plays where ends before the most recent transfer window, and search results are often last season's pages, so when either disagrees with the feed the feed is right: the player has moved. Never record a note claiming the app has somebody at the wrong club. Accept the club the feed names and search for that club's current team news instead.",
   ];
   if (inSeason) {
     lines.push(
