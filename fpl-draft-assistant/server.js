@@ -22,7 +22,7 @@ import { suggestTrades } from "./lib/trades.js";
 import { buildLearning, correctionsFrom, normaliseCorrections } from "./lib/learning.js";
 import { buildAdjustments, buildNote, pruneNotes, INTEL_KINDS, describeNote } from "./lib/intel.js";
 import { mergeState } from "./lib/syncstore.js";
-import fs from "fs";
+import { readJson, writeJson, storageInfo } from "./lib/storage.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -462,15 +462,9 @@ app.get("/api/league/:id/element-status", async (req, res) => {
  * home: a redeploy wipes it, and the next device to visit repopulates it from
  * its own storage, so nothing is lost while one signed-in browser remembers.
  */
-const SYNC_PATH = path.join(__dirname, "lib", "sync-store.json");
-
 function readSyncStore() {
-  try {
-    const parsed = JSON.parse(fs.readFileSync(SYNC_PATH, "utf8"));
-    return parsed && typeof parsed === "object" ? parsed : {};
-  } catch {
-    return {};
-  }
+  const parsed = readJson("sync-store.json", {});
+  return parsed && typeof parsed === "object" ? parsed : {};
 }
 
 app.post("/api/sync", async (req, res) => {
@@ -493,13 +487,8 @@ app.post("/api/sync", async (req, res) => {
     }, nextEvent);
 
     store[scope] = merged;
-    let persisted = true;
-    try {
-      fs.writeFileSync(SYNC_PATH, JSON.stringify(store));
-    } catch {
-      persisted = false;
-    }
-    res.json({ ...merged, persisted, nextEvent });
+    const persisted = writeJson("sync-store.json", store);
+    res.json({ ...merged, persisted, durable: storageInfo().durable, nextEvent });
   } catch (err) {
     res.status(500).json({ error: String(err.message || err) });
   }
@@ -591,6 +580,12 @@ app.get("/api/health", async (req, res) => {
     const { data, source } = await getBootstrap();
     if (source !== "live") throw new Error("falling back to the bundled demo data");
     return `${(data.elements || []).length} players, gameweek ${data?.events?.current || 0} played`;
+  });
+  await check("storage", "where notes, chat and the baseline live", async () => {
+    const info = storageInfo();
+    return info.durable
+      ? `a volume at ${info.dir}, survives every deploy`
+      : `the app directory, wiped on deploy; attach a Railway volume to make it permanent`;
   });
   await check("main game", "fixture difficulty and deadlines", async () => {
     const main = await getMainGameData();
@@ -715,6 +710,7 @@ function buildSystemPrompt(context, { webSearch = false, notes = [] } = {}) {
     "Scoring is standard FPL: appearance, goals (position-weighted), assists, clean sheets, bonus points; goalkeepers earn save points.",
     "Answer briefly and decisively. When asked to choose, give a clear first choice plus one alternative, with a one-line reason each.",
     "Use British English. Never use em dashes.",
+    "You may format with simple Markdown: bold for a player's name or a verdict, and short bullet lists where you are comparing options. No headings, no tables, no nested lists.",
   ];
   if (inSeason) {
     lines.push(
@@ -893,6 +889,37 @@ async function playerIndex() {
   };
 }
 
+/**
+ * The conversation with Nova, kept. Until now a tab switch lost it, because it
+ * lived in component state; now the server holds the last stretch per squad, on
+ * the volume when one is attached, so it follows the user between devices too.
+ */
+const CHAT_KEEP = 60;
+
+function chatScope(context) {
+  const league = String(context?.leagueId || "");
+  const entry = Number(context?.myEntryId) || 0;
+  return league && entry ? `${league}:${entry}` : null;
+}
+
+function readChats() {
+  const parsed = readJson("chat-history.json", {});
+  return parsed && typeof parsed === "object" ? parsed : {};
+}
+
+function appendChat(scope, turns) {
+  if (!scope) return;
+  const all = readChats();
+  all[scope] = [...(all[scope] || []), ...turns].slice(-CHAT_KEEP);
+  writeJson("chat-history.json", all);
+}
+
+app.get("/api/chat-history", (req, res) => {
+  const scope = chatScope({ leagueId: req.query.leagueId, myEntryId: req.query.myEntryId });
+  if (!scope) return res.json({ messages: [] });
+  res.json({ messages: readChats()[scope] || [] });
+});
+
 async function callAnthropic(body) {
   const r = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -987,13 +1014,20 @@ app.post("/api/chat", async (req, res) => {
     }
 
     const seen = new Set();
-    res.json({
-      reply,
-      sources: sources.filter((s) => (seen.has(s.url) ? false : seen.add(s.url))).slice(0, 8),
-      // The client stores these, because that is where the notes live.
-      notes: recorded,
-      rejected,
-    });
+    const uniqueSources = sources.filter((s) => (seen.has(s.url) ? false : seen.add(s.url))).slice(0, 8);
+    const lastUser = [...messages].reverse().find((m) => m.role !== "assistant");
+    appendChat(chatScope(context), [
+      { role: "user", content: String(lastUser?.content || "").slice(0, 4000), at: new Date().toISOString() },
+      {
+        role: "assistant",
+        content: reply,
+        sources: uniqueSources,
+        notes: recorded,
+        rejected,
+        at: new Date().toISOString(),
+      },
+    ]);
+    res.json({ reply, sources: uniqueSources, notes: recorded, rejected });
   } catch (err) {
     res.status(502).json({ error: String(err.message || err) });
   }

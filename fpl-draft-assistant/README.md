@@ -48,7 +48,10 @@ gameweek it is.
   squad slots (2 GKP, 5 DEF, 5 MID, 3 FWD) tracked against limits, and each
   card showing its opening-fixture difficulty.
 - **My team**: your roster as it builds, saved in your browser between visits.
-- **Nova (AI assistant)**: chat about the decision in front of you. Before the
+- **Nova (AI assistant)**: her replies are properly formatted, bold and bullet
+  lists rather than raw asterisks, and the conversation is kept per squad, so it
+  survives a reload and follows you between devices. Chat about the decision in
+  front of you. Before the
   draft that is who to pick next; once the season is under way she switches to
   weekly management and sees your squad, your opponent, and the players nobody
   owns. She can search the web for injury, line-up and transfer news, with her
@@ -184,6 +187,27 @@ The ones that cost them almost nothing are the realistic asks, and they usually
 work because the player leaving their squad was not in their eleven anyway. Any
 deal beyond that needs them to value the player differently from you, which is a
 conversation rather than a calculation.
+
+## Make it permanent: attach a volume (2 minutes)
+
+Out of the box the server's disk is wiped on every deploy, so the app keeps its
+state in your browsers and re-shares it through the sync layer. Attaching a
+Railway volume upgrades that to genuinely permanent storage with no other
+changes:
+
+1. In Railway, open your service, choose **Settings**, then **Volumes**, then
+   **Add Volume**.
+2. Mount it anywhere, `/data` is conventional. That is all: Railway announces
+   the mount path in `RAILWAY_VOLUME_MOUNT_PATH` and the app finds it by itself.
+
+From then on the team news notes, the projection log, your conversation with
+Nova and the baseline all live on the volume and survive every deploy. Check it
+worked at `your-app-url/api/health`, which reports where state lives.
+
+Why a volume rather than a Postgres database: everything this app stores is a
+few kilobytes of JSON for one league. A database server would add a driver, a
+connection string and migrations to defend against problems this app does not
+have. If it ever becomes multi-user, that is the moment for Postgres.
 
 ## Capture last season's rates before gameweek 1
 

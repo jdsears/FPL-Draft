@@ -5,6 +5,7 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { readJson, writeJson } from "./storage.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -41,6 +42,9 @@ function readSample() {
 const BASELINE_PATH = path.join(__dirname, "baseline.json");
 
 export function readBaseline() {
+  // The durable copy first, then the one committed into the repository.
+  const durable = readJson("baseline.json", null);
+  if (durable) return durable;
   try {
     return JSON.parse(fs.readFileSync(BASELINE_PATH, "utf8"));
   } catch {
@@ -57,13 +61,8 @@ export function captureBaseline(bootstrap, build) {
   if (bootstrap?.events?.current) return null; // season already under way
   const existing = readBaseline();
   if (existing) return existing;
-  try {
-    const baseline = build(bootstrap);
-    fs.writeFileSync(BASELINE_PATH, JSON.stringify(baseline));
-    return baseline;
-  } catch {
-    return null;
-  }
+  const baseline = build(bootstrap);
+  return writeJson("baseline.json", baseline) ? baseline : null;
 }
 
 export async function getBootstrap() {

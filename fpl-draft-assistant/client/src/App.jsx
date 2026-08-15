@@ -358,6 +358,9 @@ export default function App() {
       bestAvailable: best,
       recentPicks: recent,
       dataSource,
+      // Where the conversation belongs, so it can be kept and found again.
+      leagueId: leagueId || null,
+      myEntryId: myEntryId || null,
       // Once the draft is done the questions change, so tell Nova where we are.
       gameweek: seasonMode ? nextEvent : null,
       opponent: opponent?.name || null,
@@ -397,6 +400,8 @@ export default function App() {
     agents,
     learning,
     notes,
+    leagueId,
+    myEntryId,
   ]);
 
   // The draft is one evening; the season is every week, so once the draft is

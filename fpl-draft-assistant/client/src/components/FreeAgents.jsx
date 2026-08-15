@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { fetchFreeAgents, sendChat } from "../api.js";
 import FixtureRun from "./FixtureRun.jsx";
 import { deadlineLine } from "./MyWeek.jsx";
+import Markdown from "./Markdown.jsx";
 
 // There is no transfer market in a draft league, only the players nobody owns.
 // The useful question is never "who is good" but "is the best unowned player in
@@ -167,7 +168,11 @@ export default function FreeAgents({
 
       {error && <div className="banner error">Could not load free agents: {error}</div>}
       {checkError && <div className="banner error">Could not check the news: {checkError}</div>}
-      {checkSaid && <p className="week-summary">{checkSaid}</p>}
+      {checkSaid && (
+        <div className="week-summary">
+          <Markdown text={checkSaid} />
+        </div>
+      )}
       {data && (
         <p className="pmeta">
           These suggestions rest on playing-time history, which pre-season means last season's minutes. Check

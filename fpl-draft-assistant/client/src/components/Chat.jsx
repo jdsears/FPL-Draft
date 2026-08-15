@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
-import { sendChat } from "../api.js";
+import { sendChat, fetchChatHistory } from "../api.js";
 import Avatar from "./Avatar.jsx";
+import Markdown from "./Markdown.jsx";
 
 const DRAFT_SUGGESTIONS = [
   "Who should I take with my next pick?",
@@ -73,6 +74,18 @@ export default function Chat({ context, onNotes }) {
   const [error, setError] = useState("");
   const endRef = useRef(null);
 
+  // The conversation is kept server-side per squad, so it survives a tab
+  // switch, a reload, and the walk from the laptop to the phone.
+  useEffect(() => {
+    if (!context?.leagueId || !context?.myEntryId) return;
+    fetchChatHistory(context.leagueId, context.myEntryId)
+      .then((d) => {
+        if (d.messages?.length) setMessages((current) => (current.length ? current : d.messages));
+      })
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [context?.leagueId, context?.myEntryId]);
+
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, busy]);
@@ -134,7 +147,9 @@ export default function Chat({ context, onNotes }) {
           <React.Fragment key={i}>
             <div className={`msg-row ${m.role}`}>
               {m.role === "assistant" && <Avatar size={28} />}
-              <div className={`msg ${m.role}`}>{m.content}</div>
+              <div className={`msg ${m.role}`}>
+                {m.role === "assistant" ? <Markdown text={m.content} /> : m.content}
+              </div>
             </div>
             {m.role === "assistant" && <Recorded notes={m.notes} rejected={m.rejected} />}
             {m.role === "assistant" && <Sources sources={m.sources} />}

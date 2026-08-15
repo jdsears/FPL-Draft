@@ -35,6 +35,10 @@ export const fetchLearning = (body) => postJson("/api/learning", body);
 /** Every one-for-one swap with every rival, valued both ways. */
 export const fetchTrades = (body) => postJson("/api/trades", body);
 
+/** The last stretch of conversation with Nova, kept server-side per squad. */
+export const fetchChatHistory = (leagueId, myEntryId) =>
+  getJson(`/api/chat-history?leagueId=${encodeURIComponent(leagueId)}&myEntryId=${myEntryId}`);
+
 /** Push this device's notes and log, get back the union across devices. */
 export const syncState = (body) => postJson("/api/sync", body);
 

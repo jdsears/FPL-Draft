@@ -8,3 +8,4 @@ screenshots/
 # only way it survives a redeploy on a host with an ephemeral filesystem.
 # The sync cache is runtime state, per deployment, unlike the baseline.
 lib/sync-store.json
+lib/chat-history.json

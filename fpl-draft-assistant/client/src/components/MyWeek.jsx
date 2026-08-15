@@ -3,6 +3,7 @@ import { fetchMyWeek, sendChat } from "../api.js";
 import FixtureRun from "./FixtureRun.jsx";
 import Pitch from "./Pitch.jsx";
 import WeekActions from "./WeekActions.jsx";
+import Markdown from "./Markdown.jsx";
 
 // The weekly decision. Captains are disabled in this league, so the only lever
 // each gameweek is which eleven of the fifteen start, and the only thing that
@@ -336,7 +337,11 @@ export default function MyWeek({
           </button>
         </form>
         {scoutError && <div className="banner error">Could not check the news: {scoutError}</div>}
-        {scoutSaid && <p className="week-summary">{scoutSaid}</p>}
+        {scoutSaid && (
+          <div className="week-summary">
+            <Markdown text={scoutSaid} />
+          </div>
+        )}
         {notes?.map((note) => (
           <div key={note.id} className={`week-row sos-row ${note.kind === "out" || note.kind === "suspended" ? "sos-hard" : ""}`.trim()}>
             <span className="week-main">
