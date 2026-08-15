@@ -267,26 +267,36 @@ export default function MyWeek({
 
         {data?.opponent ? (
           <div className="scoreboard">
-            <div className="scoreboard-side">
-              <span className="scoreboard-team">{myName || "Your team"}</span>
-              <span className={`scoreboard-value ${lineup && lineup.expected >= data.opponent.expected ? "lead" : ""}`.trim()}>
-                {lineup ? lineup.expected.toFixed(1) : "0.0"}
-              </span>
+            <div className="scoreboard-row">
+              <div className="scoreboard-side">
+                <span className="scoreboard-team">{myName || "Your team"}</span>
+                <span className={`scoreboard-value ${lineup && lineup.expected >= data.opponent.expected ? "lead" : ""}`.trim()}>
+                  {lineup ? lineup.expected.toFixed(1) : "0.0"}
+                </span>
+              </div>
+              <span className="scoreboard-sep">projected</span>
+              <div className="scoreboard-side scoreboard-them">
+                <span className="scoreboard-team">{opponent?.name || "Opponent"}</span>
+                <span className={`scoreboard-value ${lineup && data.opponent.expected > lineup.expected ? "lead" : ""}`.trim()}>
+                  {data.opponent.expected.toFixed(1)}
+                </span>
+              </div>
             </div>
-            <span className="scoreboard-sep">projected</span>
-            <div className="scoreboard-side scoreboard-them">
-              <span className="scoreboard-team">{opponent?.name || "Opponent"}</span>
-              <span className={`scoreboard-value ${lineup && data.opponent.expected > lineup.expected ? "lead" : ""}`.trim()}>
-                {data.opponent.expected.toFixed(1)}
-              </span>
+            {/* Each side's share of the projected points, as a bar. Grows are
+                floored at 1 so they always sum past 1 and fill the track. */}
+            <div className="scoreboard-bar" aria-hidden="true">
+              <span className="bar-me" style={{ flexGrow: Math.max(lineup?.expected || 0, 1) }} />
+              <span className="bar-them" style={{ flexGrow: Math.max(data.opponent.expected, 1) }} />
             </div>
           </div>
         ) : (
           lineup?.playable && (
             <div className="scoreboard scoreboard-solo">
-              <div className="scoreboard-side">
-                <span className="scoreboard-team">Projected this gameweek</span>
-                <span className="scoreboard-value">{lineup.expected.toFixed(1)}</span>
+              <div className="scoreboard-row">
+                <div className="scoreboard-side">
+                  <span className="scoreboard-team">Projected this gameweek</span>
+                  <span className="scoreboard-value">{lineup.expected.toFixed(1)}</span>
+                </div>
               </div>
             </div>
           )

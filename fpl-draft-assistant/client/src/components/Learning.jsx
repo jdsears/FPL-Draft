@@ -179,8 +179,8 @@ export default function Learning({ learning, error, onRestored }) {
       )}
 
       <p className="pmeta">
-        This record is kept in this browser, so it does not follow you to another device on its own and a
-        cleared browser loses it.
+        This record follows you between devices whenever one of them opens the app. A backup is still worth
+        keeping in case every browser is cleared at once.
       </p>
       <Backup onRestored={onRestored} />
     </div>

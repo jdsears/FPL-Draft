@@ -1,8 +1,9 @@
 // Team news notes, kept in this browser.
 //
-// Same reasoning as the projection log: the server's filesystem is wiped on
-// every deploy and there is no database, so anywhere else these would quietly
-// disappear. They travel up with each request and come back applied.
+// Same reasoning as the projection log: the browser copy is the truth and the
+// server's sync store is a cache any device can repopulate, so nothing is lost
+// however the server is hosted. They travel up with each request and come back
+// applied.
 
 const KEY = "fplda.notes";
 
