@@ -73,14 +73,21 @@ export function addNotes(scope, incoming) {
 }
 
 export function removeNote(scope, id) {
+  return removeNotes(scope, [id]);
+}
+
+/** Forget several notes at once, tombstoning each so no device pushes it back. */
+export function removeNotes(scope, ids) {
+  const wanted = new Set(ids || []);
+  if (!wanted.size) return readNotes(scope);
   const all = readAll();
   const notes = readNotes(scope);
-  const dead = notes.find((note) => note.id === id);
-  const kept = notes.filter((note) => note.id !== id);
+  const dead = notes.filter((note) => wanted.has(note.id));
+  const kept = notes.filter((note) => !wanted.has(note.id));
   // The tombstone must outlive the note, or another device pushes it back.
-  const deleted = dead
-    ? readDeleted(scope).concat({ id, until: Number(dead.expiresAfterEvent) || Number(dead.event) + 12 })
-    : readDeleted(scope);
+  const deleted = readDeleted(scope).concat(
+    dead.map((note) => ({ id: note.id, until: Number(note.expiresAfterEvent) || Number(note.event) + 12 }))
+  );
   writeScope(all, scope, kept, deleted);
   return kept;
 }

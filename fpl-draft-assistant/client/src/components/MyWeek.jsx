@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { fetchMyWeek, sendChatJob } from "../api.js";
+import { orderNotes, oldNoteIds } from "../newsOrder.js";
 import FixtureRun from "./FixtureRun.jsx";
 import Pitch from "./Pitch.jsx";
 import WeekActions from "./WeekActions.jsx";
@@ -86,6 +87,7 @@ export default function MyWeek({
   notes,
   onNotes,
   onForgetNote,
+  onForgetNotes,
   chatContext,
   agents,
 }) {
@@ -99,6 +101,7 @@ export default function MyWeek({
   const [scoutSaid, setScoutSaid] = useState("");
   const [scoutError, setScoutError] = useState("");
   const [tip, setTip] = useState("");
+  const [showAllNotes, setShowAllNotes] = useState(false);
 
   // Stable primitive keys so the fetch does not re-run on every render of the
   // parent, which re-derives these arrays each time picks are polled.
@@ -274,6 +277,18 @@ export default function MyWeek({
 
   const lineup = data?.lineup;
   const event = data?.nextEvent || nextEvent;
+
+  // The news list runs long after a full sweep, so it leads with what matters
+  // (your players, worst news first) and folds the rest behind a button.
+  const NOTE_PREVIEW = 4;
+  const mineIds = new Set([...(lineup?.starters || []), ...(lineup?.bench || [])].map((p) => p.id));
+  const theirIds = new Set(
+    [...(data?.opponent?.starters || []), ...(data?.opponent?.bench || [])].map((p) => p.id)
+  );
+  const orderedNotes = orderNotes(notes || [], { mine: mineIds, theirs: theirIds });
+  const visibleNotes = showAllNotes ? orderedNotes : orderedNotes.slice(0, NOTE_PREVIEW);
+  const hiddenCount = orderedNotes.length - visibleNotes.length;
+  const oldIds = oldNoteIds(notes || [], event);
   const footnotes = [];
   if (data?.source === "sample") footnotes.push("These are demo numbers, because live FPL data is unreachable.");
   if (data && !data.fixturesAvailable) {
@@ -399,8 +414,13 @@ export default function MyWeek({
             <Markdown text={scoutSaid} />
           </div>
         )}
-        {notes?.map((note) => (
-          <div key={note.id} className={`week-row sos-row ${note.kind === "out" || note.kind === "suspended" ? "sos-hard" : ""}`.trim()}>
+        {visibleNotes.map((note) => (
+          <div
+            key={note.id}
+            className={`week-row sos-row ${note.kind === "out" || note.kind === "suspended" ? "sos-hard" : ""} ${
+              Number(note.event) < event ? "note-old" : ""
+            }`.trim()}
+          >
             <span className="week-main">
               <span className="pname">
                 <span className={`pos pos-${note.position}`}>{note.position}</span> {note.playerName}
@@ -419,6 +439,7 @@ export default function MyWeek({
                   </>
                 ) : null}
                 {" "}· until gameweek {note.expiresAfterEvent}
+                {Number(note.event) < event ? ` · recorded for gameweek ${note.event}` : ""}
               </span>
             </span>
             <button className="mark gone" onClick={() => onForgetNote?.(note.id)} title="Forget this note">
@@ -426,6 +447,20 @@ export default function MyWeek({
             </button>
           </div>
         ))}
+        {(hiddenCount > 0 || showAllNotes || oldIds.length > 0) && (
+          <div className="controls news-actions">
+            {(hiddenCount > 0 || showAllNotes) && (
+              <button className="chip subtle" onClick={() => setShowAllNotes((v) => !v)}>
+                {showAllNotes ? "Show fewer" : `Show all ${orderedNotes.length} notes`}
+              </button>
+            )}
+            {oldIds.length > 0 && (
+              <button className="chip subtle" onClick={() => onForgetNotes?.(oldIds)}>
+                Forget {oldIds.length} old note{oldIds.length === 1 ? "" : "s"}
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {lineup?.playable && (

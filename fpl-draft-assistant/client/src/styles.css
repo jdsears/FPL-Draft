@@ -1013,6 +1013,9 @@ table.board { width: 100%; border-collapse: collapse; background: var(--panel); 
 
 /* Team news notes */
 .week-news .week-row { align-items: flex-start; }
+/* News recorded for a gameweek already played fades back until it is swept */
+.note-old { opacity: 0.72; }
+.news-actions { margin: 8px 0 0; }
 /* A little link with a full-size thumb behind it, like the sync button. */
 .note-source { position: relative; display: inline-block; padding: 2px 4px; font-weight: 600; color: var(--accent); }
 .note-source::after {

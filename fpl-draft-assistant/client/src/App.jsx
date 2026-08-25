@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fetchBootstrap, fetchLeague, fetchChoices, fetchLearning, syncState } from "./api.js";
 import { scopeFor, readLog, readLogMap, replaceLogMap, recordProjection } from "./learning.js";
-import { readNotes, readDeleted, addNotes, removeNote, pruneExpired, replaceState } from "./notes.js";
+import { readNotes, readDeleted, addNotes, removeNote, removeNotes, pruneExpired, replaceState } from "./notes.js";
 import DraftBoard from "./components/DraftBoard.jsx";
 import BestAvailable from "./components/BestAvailable.jsx";
 import Roster from "./components/Roster.jsx";
@@ -526,6 +526,15 @@ export default function App() {
     [logScope, requestSync]
   );
 
+  // Several at once, for sweeping out last week's news in one tap.
+  const onForgetNotes = useCallback(
+    (ids) => {
+      setNotes(removeNotes(logScope, ids));
+      requestSync();
+    },
+    [logScope, requestSync]
+  );
+
   const onSetLeague = (id) => {
     setLeagueId(id);
     save("fplda.leagueId", id);
@@ -589,6 +598,7 @@ export default function App() {
             onLoaded={onWeek}
             notes={notes}
             onForgetNote={onForgetNote}
+            onForgetNotes={onForgetNotes}
             onNotes={onNotes}
             chatContext={chatContext}
             agents={agents}
