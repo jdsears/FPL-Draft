@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { fetchMyWeek, sendChat } from "../api.js";
+import { fetchMyWeek, sendChatJob } from "../api.js";
 import FixtureRun from "./FixtureRun.jsx";
 import Pitch from "./Pitch.jsx";
 import WeekActions from "./WeekActions.jsx";
@@ -152,7 +152,7 @@ export default function MyWeek({
       setScoutError("");
       setScoutSaid("");
       try {
-        const result = await sendChat([{ role: "user", content: ask }], chatContext, { thorough: true });
+        const result = await sendChatJob([{ role: "user", content: ask }], chatContext, { thorough: true });
         setScoutSaid(result.reply || "Nothing new found.");
         if (result.notes?.length) onNotes?.(result.notes);
         else load();
@@ -205,8 +205,14 @@ export default function MyWeek({
       for (const part of parts) {
         if (!part.clubs) continue;
         setScoutStage(part.stage);
-        const result = await sendChat([{ role: "user", content: ask(part.who, part.clubs) }], chatContext, {
+        const result = await sendChatJob([{ role: "user", content: ask(part.who, part.clubs) }], chatContext, {
           thorough: true,
+          onProgress: (progress) =>
+            setScoutStage(
+              progress?.notes
+                ? `${part.stage}, ${progress.notes} note${progress.notes === 1 ? "" : "s"} so far`
+                : part.stage
+            ),
         });
         if (result.reply) {
           said.push(result.reply);

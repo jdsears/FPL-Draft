@@ -42,6 +42,16 @@ export const fetchChatHistory = (leagueId, myEntryId) =>
 /** Push this device's notes and log, get back the union across devices. */
 export const syncState = (body) => postJson("/api/sync", body);
 
+function normaliseChat(data) {
+  return {
+    reply: data.reply,
+    sources: Array.isArray(data.sources) ? data.sources : [],
+    // Team news Nova recorded during the turn, for the caller to store.
+    notes: Array.isArray(data.notes) ? data.notes : [],
+    rejected: Array.isArray(data.rejected) ? data.rejected : [],
+  };
+}
+
 export async function sendChat(messages, context, options = {}) {
   const res = await fetch("/api/chat", {
     method: "POST",
@@ -50,11 +60,45 @@ export async function sendChat(messages, context, options = {}) {
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || `Chat failed (${res.status})`);
-  return {
-    reply: data.reply,
-    sources: Array.isArray(data.sources) ? data.sources : [],
-    // Team news Nova recorded during the turn, for the caller to store.
-    notes: Array.isArray(data.notes) ? data.notes : [],
-    rejected: Array.isArray(data.rejected) ? data.rejected : [],
-  };
+  return normaliseChat(data);
+}
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * The same exchange, run as a server-side job and polled for. Long work must
+ * not hang on one held-open request, because a phone browser kills those: iOS
+ * Safari gives up around a minute, and a locked screen sooner. A poll survives
+ * both, and if the phone spends the sweep in a pocket the finished result is
+ * still waiting server-side when it comes back.
+ */
+export async function sendChatJob(messages, context, options = {}) {
+  const res = await fetch("/api/chat", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ messages, context, thorough: options.thorough === true, background: true }),
+  });
+  const started = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(started.error || `Chat failed (${res.status})`);
+
+  const deadline = Date.now() + 6 * 60 * 1000;
+  let misses = 0;
+  while (Date.now() < deadline) {
+    await sleep(2500);
+    let poll;
+    try {
+      poll = await fetch(`/api/chat-job/${started.jobId}`);
+    } catch {
+      // One dropped poll is a tunnel or a lock screen; a run of them is real.
+      if (++misses >= 8) throw new Error("Lost contact while Nova was working. Try again.");
+      continue;
+    }
+    misses = 0;
+    const job = await poll.json().catch(() => ({}));
+    if (!poll.ok) throw new Error(job.error || `The job could not be read (${poll.status}).`);
+    if (job.status === "failed") throw new Error(job.error || "Nova could not finish the job.");
+    if (job.status === "done") return normaliseChat(job.result || {});
+    options.onProgress?.(job.progress || {});
+  }
+  throw new Error("Nova is taking longer than expected. Give it a minute and try again.");
 }

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { fetchFreeAgents, sendChat } from "../api.js";
+import { fetchFreeAgents, sendChatJob } from "../api.js";
 import FixtureRun from "./FixtureRun.jsx";
 import { deadlineLine } from "./MyWeek.jsx";
 import Markdown from "./Markdown.jsx";
@@ -109,7 +109,7 @@ export default function FreeAgents({
     setCheckError("");
     setCheckSaid("");
     try {
-      const result = await sendChat(
+      const result = await sendChatJob(
         [
           {
             role: "user",

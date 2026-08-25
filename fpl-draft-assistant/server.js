@@ -946,24 +946,16 @@ async function callAnthropic(body) {
   throw lastError;
 }
 
-app.post("/api/chat", async (req, res) => {
-  if (!ANTHROPIC_API_KEY) {
-    return res.status(400).json({
-      error:
-        "No ANTHROPIC_API_KEY is set. Add it as an environment variable in Railway (Settings > Variables) to enable the AI assistant.",
-    });
-  }
-  const { messages, context } = req.body || {};
-  if (!Array.isArray(messages) || messages.length === 0) {
-    return res.status(400).json({ error: "messages array required" });
-  }
-
-  try {
+/**
+ * One full exchange with Nova: the tool loop, the notes, the reply. Pulled out
+ * of the route so it can run inside a request or as a background job.
+ */
+async function runChat({ messages, context, thorough, onProgress }) {
+  {
     const { players, nextEvent } = await playerIndex();
     // A full news sweep across two squads needs more searching than a chat
     // question, so the scout buttons ask for a bigger budget. Each search is
     // billed, which is why it is per request rather than always on.
-    const thorough = req.body?.thorough === true;
     const tools = [INTEL_TOOL];
     if (WEB_SEARCH_ENABLED) tools.push({ ...WEB_SEARCH_TOOL, max_uses: thorough ? 8 : 3 });
 
@@ -1009,6 +1001,7 @@ app.post("/api/chat", async (req, res) => {
       console.log(
         `[chat] iteration=${iteration} stop=${data.stop_reason} notes=${calls.length} searches=${searches} thorough=${thorough}`
       );
+      onProgress?.({ iterations: iteration + 1, notes: recorded.length });
       if (data.stop_reason !== "tool_use" && data.stop_reason !== "pause_turn") {
         finished = true;
         break;
@@ -1041,6 +1034,7 @@ app.post("/api/chat", async (req, res) => {
         };
       });
       turns.push({ role: "user", content: results });
+      onProgress?.({ iterations: iteration + 1, notes: recorded.length });
     }
 
     // Whatever happened in the loop, the user gets an honest sentence, never
@@ -1071,10 +1065,74 @@ app.post("/api/chat", async (req, res) => {
         at: new Date().toISOString(),
       },
     ]);
-    res.json({ reply, sources: uniqueSources, notes: recorded, rejected });
+    return { reply, sources: uniqueSources, notes: recorded, rejected };
+  }
+}
+
+// ---------- Long Nova jobs ----------
+// A full news sweep can outlive what a phone will hold open for one request:
+// iOS Safari kills a fetch around the minute mark, and a locked screen kills it
+// sooner, which surfaced as "Load failed" with half the sweep done. So long
+// work runs as a job: POST starts it and returns an id straight away, the
+// client polls for the result, and the result waits here however long the
+// phone spent in a pocket. In memory only, because a lost job is only ever a
+// redeploy away from "run it again".
+const CHAT_JOBS = new Map();
+const JOB_TTL_MS = 15 * 60 * 1000;
+const JOB_CAP = 50;
+
+function sweepJobs() {
+  const now = Date.now();
+  for (const [id, job] of CHAT_JOBS) {
+    if (now - job.createdAt > JOB_TTL_MS) CHAT_JOBS.delete(id);
+  }
+  // A runaway client cannot fill the map: oldest first out.
+  while (CHAT_JOBS.size > JOB_CAP) CHAT_JOBS.delete(CHAT_JOBS.keys().next().value);
+}
+
+app.post("/api/chat", async (req, res) => {
+  if (!ANTHROPIC_API_KEY) {
+    return res.status(400).json({
+      error:
+        "No ANTHROPIC_API_KEY is set. Add it as an environment variable in Railway (Settings > Variables) to enable the AI assistant.",
+    });
+  }
+  const { messages, context } = req.body || {};
+  if (!Array.isArray(messages) || messages.length === 0) {
+    return res.status(400).json({ error: "messages array required" });
+  }
+  const thorough = req.body?.thorough === true;
+
+  if (req.body?.background === true) {
+    sweepJobs();
+    const id = crypto.randomUUID();
+    const job = { status: "working", createdAt: Date.now(), progress: {} };
+    CHAT_JOBS.set(id, job);
+    runChat({ messages, context, thorough, onProgress: (p) => { job.progress = p; } })
+      .then((result) => {
+        job.status = "done";
+        job.result = result;
+      })
+      .catch((err) => {
+        job.status = "failed";
+        job.error = String(err.message || err);
+      });
+    return res.json({ jobId: id });
+  }
+
+  try {
+    res.json(await runChat({ messages, context, thorough }));
   } catch (err) {
     res.status(502).json({ error: String(err.message || err) });
   }
+});
+
+app.get("/api/chat-job/:id", (req, res) => {
+  const job = CHAT_JOBS.get(req.params.id);
+  if (!job) {
+    return res.status(404).json({ error: "That job is gone, most likely to a redeploy. Run it again." });
+  }
+  res.json({ status: job.status, progress: job.progress, result: job.result, error: job.error });
 });
 
 // ---------- Static client ----------
