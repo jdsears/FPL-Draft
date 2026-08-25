@@ -149,6 +149,22 @@ test("two reasons to worry compound, two reasons to like do not", () => {
   assert.equal(good[1].factor, pens[1].factor, "on penalties and in form is one observation, not two");
 });
 
+test("the same kind of note recorded twice counts once, and the newest wins", () => {
+  // A repeated news sweep records the same doubt again with a fresh id. That is
+  // the same observation twice, not twice the evidence.
+  const older = { ...note({ kind: "doubt", confidence: "high" }), id: "a", at: "2026-09-19" };
+  const newer = { ...note({ kind: "doubt", confidence: "low" }), id: "b", at: "2026-09-21" };
+  const twice = buildAdjustments([older, newer], 6);
+  const newestOnly = buildAdjustments([newer], 6);
+  assert.equal(twice[1].factor, newestOnly[1].factor, "only the newest note of a kind moves the number");
+  assert.equal(twice[1].notes.length, 1, "and only one of them is shown as applied");
+
+  // Different kinds still compound as before.
+  const doubtOnly = buildAdjustments([older], 6);
+  const mixed = buildAdjustments([older, note({ kind: "rotation", confidence: "high" })], 6);
+  assert.ok(mixed[1].factor < doubtOnly[1].factor, "a different kind of worry still compounds");
+});
+
 test("no pile of notes can run away with a projection", () => {
   const good = Array.from({ length: 8 }, () => note({ kind: "penalties", confidence: "high" }));
   const bad = Array.from({ length: 8 }, () => note({ kind: "out", confidence: "high" }));

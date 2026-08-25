@@ -161,9 +161,20 @@ export function isLive(note, event) {
  */
 export function buildAdjustments(notes, event) {
   const live = (notes || []).filter((note) => note && isLive(note, event));
-  const byPlayer = new Map();
 
+  // Two notes of the same kind about the same player are the same observation
+  // recorded twice, not twice the evidence, so only the newest counts. Without
+  // this, a repeated sweep compounds its own echo: two "doubt" notes would
+  // multiply to far worse than the manager ever said.
+  const newest = new Map();
   for (const note of live) {
+    const key = `${note.playerId}:${note.kind}`;
+    const existing = newest.get(key);
+    if (!existing || String(note.at || "") > String(existing.at || "")) newest.set(key, note);
+  }
+
+  const byPlayer = new Map();
+  for (const note of newest.values()) {
     const spec = INTEL_KINDS[note.kind];
     if (!spec) continue;
     const weight = CONFIDENCE[note.confidence] ?? CONFIDENCE.medium;

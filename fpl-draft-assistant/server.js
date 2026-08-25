@@ -924,18 +924,26 @@ app.get("/api/chat-history", (req, res) => {
 });
 
 async function callAnthropic(body) {
-  const r = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-api-key": ANTHROPIC_API_KEY,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify(body),
-  });
-  const data = await r.json();
-  if (!r.ok) throw new Error(data?.error?.message || `Anthropic API error ${r.status}`);
-  return data;
+  // Rate limits and overload are a when, not an if, in the middle of a long
+  // news sweep, and one of them must not kill the whole request.
+  let lastError;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (attempt > 0) await new Promise((resolve) => setTimeout(resolve, attempt * 2000));
+    const r = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-api-key": ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify(body),
+    });
+    const data = await r.json().catch(() => ({}));
+    if (r.ok) return data;
+    lastError = new Error(data?.error?.message || `Anthropic API error ${r.status}`);
+    if (r.status !== 429 && r.status !== 529 && r.status < 500) throw lastError;
+  }
+  throw lastError;
 }
 
 app.post("/api/chat", async (req, res) => {
@@ -968,10 +976,18 @@ app.post("/api/chat", async (req, res) => {
     const rejected = [];
     const sources = [];
     let reply = "";
+    let finished = false;
 
     // Nova may take several notes in one turn, and may want to search first, so
-    // the exchange runs as a short loop rather than a single call.
-    for (let round = 0; round < (thorough ? 6 : 4); round++) {
+    // the exchange runs as a short loop rather than a single call. Two budgets:
+    // work rounds, where she records notes or answers, and a hard cap on
+    // iterations overall. A pause_turn continuation mid-search spends only the
+    // hard cap, because a news-heavy week once burnt the whole budget on
+    // searching and fell out of the loop with nothing recorded and no reply.
+    const maxWork = thorough ? 8 : 4;
+    const maxTotal = thorough ? 16 : 8;
+    let work = 0;
+    for (let iteration = 0; iteration < maxTotal && work < maxWork; iteration++) {
       const data = await callAnthropic({
         model: MODEL,
         max_tokens: thorough ? 4096 : 3072,
@@ -987,13 +1003,24 @@ app.post("/api/chat", async (req, res) => {
         .trim() || reply;
 
       const calls = (data.content || []).filter((b) => b.type === "tool_use" && b.name === INTEL_TOOL.name);
-      if (data.stop_reason !== "tool_use" && data.stop_reason !== "pause_turn") break;
+      const searches = (data.content || []).filter((b) => b.type === "server_tool_use").length;
+      // A line per round in the deploy logs, because a sweep that goes wrong in
+      // production is otherwise invisible.
+      console.log(
+        `[chat] iteration=${iteration} stop=${data.stop_reason} notes=${calls.length} searches=${searches} thorough=${thorough}`
+      );
+      if (data.stop_reason !== "tool_use" && data.stop_reason !== "pause_turn") {
+        finished = true;
+        break;
+      }
       turns.push({ role: "assistant", content: data.content });
       if (!calls.length) {
         // A pause with nothing for us to do means the API is mid-search.
         if (data.stop_reason === "pause_turn") continue;
+        finished = true;
         break;
       }
+      work++;
 
       const results = calls.map((call) => {
         const built = buildNote(call.input, {
@@ -1015,6 +1042,20 @@ app.post("/api/chat", async (req, res) => {
       });
       turns.push({ role: "user", content: results });
     }
+
+    // Whatever happened in the loop, the user gets an honest sentence, never
+    // silence dressed up as "nothing new".
+    if (!finished) {
+      const tail = "I ran out of room before finishing the sweep. Ask me to carry on and I will pick up where I stopped.";
+      reply = reply ? `${reply}\n\n${tail}` : tail;
+    }
+    if (!reply && recorded.length) {
+      reply =
+        `I recorded ${recorded.length} note${recorded.length === 1 ? "" : "s"}: ` +
+        recorded.map((n) => `**${n.playerName}** (${n.label.toLowerCase()})`).join(", ") +
+        ". They are in the numbers now.";
+    }
+    if (!reply) reply = "I could not turn anything up, and I have nothing new to record.";
 
     const seen = new Set();
     const uniqueSources = sources.filter((s) => (seen.has(s.url) ? false : seen.add(s.url))).slice(0, 8);

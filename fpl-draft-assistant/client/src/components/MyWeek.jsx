@@ -95,6 +95,7 @@ export default function MyWeek({
   const [expanded, setExpanded] = useState(null);
   const [showOpponent, setShowOpponent] = useState(false);
   const [scouting, setScouting] = useState(false);
+  const [scoutStage, setScoutStage] = useState("");
   const [scoutSaid, setScoutSaid] = useState("");
   const [scoutError, setScoutError] = useState("");
   const [tip, setTip] = useState("");
@@ -164,31 +165,69 @@ export default function MyWeek({
     [scouting, chatContext, onNotes, load]
   );
 
-  // The sweep names every player on both sides, grouped by club, because one
-  // search of a club's press conference round-up covers several players at
-  // once, where one search per player would burn the budget on the first few.
-  const scout = useCallback(() => {
+  // The sweep names every player, grouped by club, because one search of a
+  // club's press conference round-up covers several players at once, where one
+  // search per player would burn the budget on the first few. It runs as two
+  // requests, your squad and then theirs: one request covering both once ran
+  // long enough on a news-heavy week to exhaust its budget and come back with
+  // nothing, and half the sweep landing is worth more than all of it failing.
+  const scout = useCallback(async () => {
+    if (scouting) return;
     const event = data?.nextEvent || nextEvent;
+    const clubsOf = (list) => {
+      const byClub = new Map();
+      for (const player of list) {
+        const club = player.teamName || player.teamShort || "unknown";
+        if (!byClub.has(club)) byClub.set(club, new Set());
+        byClub.get(club).add(player.name);
+      }
+      return [...byClub.entries()]
+        .map(([club, names]) => `${club}: ${[...names].join(", ")}`)
+        .join("; ");
+    };
+    const ask = (who, clubs) =>
+      `Do a team news sweep for gameweek ${event} covering ${who}, club by club: ${clubs}. ` +
+      "Search each club's latest press conference, injury and predicted line-up news rather than one " +
+      "search per player, since a round-up covers several of these at once. Record everything factual " +
+      "with record_intel, one note per player, including confirmed starters. Then reply in at most " +
+      "four short lines, saying only what changes who I should start.";
     const mine = [...(data?.lineup?.starters || []), ...(data?.lineup?.bench || [])];
     const theirs = [...(data?.opponent?.starters || []), ...(data?.opponent?.bench || [])];
-    const byClub = new Map();
-    for (const player of [...mine, ...theirs]) {
-      const club = player.teamName || player.teamShort || "unknown";
-      if (!byClub.has(club)) byClub.set(club, new Set());
-      byClub.get(club).add(player.name);
+    const parts = [{ stage: "your clubs", who: "my squad", clubs: clubsOf(mine) }];
+    if (theirs.length) parts.push({ stage: "their clubs", who: "my opponent's squad", clubs: clubsOf(theirs) });
+
+    setScouting(true);
+    setScoutError("");
+    setScoutSaid("");
+    let recordedAny = false;
+    const said = [];
+    try {
+      for (const part of parts) {
+        if (!part.clubs) continue;
+        setScoutStage(part.stage);
+        const result = await sendChat([{ role: "user", content: ask(part.who, part.clubs) }], chatContext, {
+          thorough: true,
+        });
+        if (result.reply) {
+          said.push(result.reply);
+          setScoutSaid(said.join("\n\n"));
+        }
+        // Notes land half by half, so the eleven updates while she is still out
+        // looking at the other squad.
+        if (result.notes?.length) {
+          recordedAny = true;
+          onNotes?.(result.notes);
+        }
+      }
+      if (!said.length) setScoutSaid("Nothing new found.");
+      if (!recordedAny) load();
+    } catch (e) {
+      setScoutError(String(e.message || e));
+    } finally {
+      setScouting(false);
+      setScoutStage("");
     }
-    const clubs = [...byClub.entries()]
-      .map(([club, names]) => `${club}: ${[...names].join(", ")}`)
-      .join("; ");
-    return askNova(
-      `Do a full team news sweep for gameweek ${event}. The players that matter, by club, covering my squad` +
-        `${theirs.length ? " and my opponent's" : ""}: ${clubs || "my squad"}. ` +
-        "Work club by club, searching each club's latest press conference, injury and predicted line-up news " +
-        "rather than one search per player, since a round-up covers several of these at once. Record everything " +
-        "factual with record_intel, one note per player, including confirmed starters. Then reply in at most " +
-        "four short lines, saying only what changes who I should start."
-    );
-  }, [askNova, data, nextEvent]);
+  }, [scouting, data, nextEvent, chatContext, onNotes, load]);
 
   const tell = useCallback(
     (event) => {
@@ -325,9 +364,11 @@ export default function MyWeek({
           <div>
             <h3>Team news</h3>
             <p className="pmeta">
-              {notes?.length
-                ? `${notes.length} note${notes.length === 1 ? "" : "s"} on file, already in the numbers below.`
-                : "Nothing on file. Nova can go and look, or tell her anything you have heard."}
+              {scouting
+                ? `Nova is checking ${scoutStage || "the news"}. This takes a minute or two.`
+                : notes?.length
+                  ? `${notes.length} note${notes.length === 1 ? "" : "s"} on file, already in the numbers below.`
+                  : "Nothing on file. Nova can go and look, or tell her anything you have heard."}
             </p>
           </div>
           <button className="chip active" onClick={scout} disabled={scouting}>

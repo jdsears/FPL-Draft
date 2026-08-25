@@ -54,11 +54,21 @@ export function addNotes(scope, incoming) {
   const fresh = (incoming || []).filter((note) => note && note.playerId && note.kind);
   if (!scope || !fresh.length) return readNotes(scope);
   const all = readAll();
-  const existing = readNotes(scope).filter(
-    (note) => !fresh.some((n) => n.playerId === note.playerId && n.kind === note.kind)
+  // A replaced note needs a tombstone like a deleted one, or the next sync
+  // round trip resurrects it from the server and the same news counts twice.
+  const replaced = [];
+  const existing = readNotes(scope).filter((note) => {
+    const superseded = fresh.some((n) => n.playerId === note.playerId && n.kind === note.kind);
+    if (superseded) replaced.push(note);
+    return !superseded;
+  });
+  const deleted = readDeleted(scope).concat(
+    replaced
+      .filter((note) => note.id)
+      .map((note) => ({ id: note.id, until: Number(note.expiresAfterEvent) || Number(note.event) + 12 }))
   );
   const merged = existing.concat(fresh.map((note) => ({ ...note, id: note.id || crypto.randomUUID?.() || `${note.playerId}-${note.kind}-${Date.now()}` })));
-  writeScope(all, scope, merged, readDeleted(scope));
+  writeScope(all, scope, merged, deleted);
   return merged;
 }
 
