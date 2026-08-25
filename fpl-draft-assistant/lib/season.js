@@ -28,6 +28,17 @@ export const PLANNING_WINDOW = 5;
 /** Form is noise until a few gameweeks have been played. */
 export const FORM_MIN_GAMEWEEKS = 3;
 
+// How the season's evidence is weighed against the prior once the season is
+// live. The prior counts as this many appearances at last season's rate, so
+// one gameweek is a sixth of the answer, five is half, and by mid-season the
+// current rate has taken over. Without this, gameweek 1 was the whole dataset:
+// FPL wipes last season's stats at kick-off, and one quiet opening afternoon
+// halved a proven player's number.
+export const RATE_SHRINK = 5;
+// The same idea for minutes: how many gameweeks of "did he actually play"
+// it takes to outweigh what last season's minutes said.
+export const PLAY_SHRINK = 4;
+
 /** How hard fixture difficulty pushes an expectation, per point off neutral. */
 export const FIXTURE_SWING = 0.12;
 export const FIXTURE_SWING_CAP = 0.2;
@@ -35,6 +46,47 @@ export const FIXTURE_SWING_CAP = 0.2;
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 const round1 = (value) => Math.round(value * 10) / 10;
 const round2 = (value) => Math.round(value * 100) / 100;
+
+/**
+ * What a player with no Premier League record should be assumed to score: the
+ * last-season rate of the same-ranked player at his position. FPL ranks every
+ * player for the draft, newcomers included, so a summer signing ranked as the
+ * sixth midfielder starts life projected like last season's sixth-best
+ * midfielder, rather than like his own first afternoon. Returns a Map of
+ * element id to { rate, play }.
+ */
+export function buildRankPriors(elements, baseline) {
+  if (!baseline) return new Map();
+  // Last season's distribution per position, best rate first, from players
+  // with enough appearances for their rate to mean something.
+  const distributions = new Map();
+  for (const e of elements) {
+    const prior = baseline[e.code];
+    if (!prior || (Number(prior.appearances) || 0) < 10) continue;
+    const list = distributions.get(e.element_type) || [];
+    list.push({
+      rate: Number(prior.pointsPerGame) || 0,
+      play: clamp((Number(prior.appearances) || 0) / GAMEWEEKS_IN_SEASON, 0, 1),
+    });
+    distributions.set(e.element_type, list);
+  }
+  for (const list of distributions.values()) list.sort((a, b) => b.rate - a.rate);
+
+  const byPosition = new Map();
+  for (const e of elements) {
+    const list = byPosition.get(e.element_type) || [];
+    list.push(e);
+    byPosition.set(e.element_type, list);
+  }
+  const priors = new Map();
+  for (const [type, list] of byPosition) {
+    const distribution = distributions.get(type);
+    if (!distribution?.length) continue;
+    list.sort((a, b) => (Number(a.draft_rank) || Infinity) - (Number(b.draft_rank) || Infinity));
+    list.forEach((e, i) => priors.set(e.id, distribution[Math.min(i, distribution.length - 1)]));
+  }
+  return priors;
+}
 
 /**
  * Fixture difficulty over a planning window swings an expectation further than
@@ -62,6 +114,12 @@ export function appearancesFrom(totalPoints, pointsPerGame, starts) {
 function describe(player) {
   const b = player.season;
   const parts = [`${round1(b.perFixture)} a game when they play`];
+
+  // Early season the number is mostly last season's level, and the card
+  // should say so rather than leave a quiet opener looking like a verdict.
+  if (!b.preSeason && (b.weights?.prior || 0) > 0.5) {
+    parts.push("rated mostly on last season while this season is a small sample");
+  }
 
   const chance = Math.round(b.playProbability * 100);
   if (chance >= 90) parts.push("plays virtually every week");
@@ -126,30 +184,83 @@ export function buildSeasonProjections(bootstrap, options = {}) {
 
   const teams = new Map((bootstrap?.teams || []).map((t) => [t.id, t]));
   const elements = (bootstrap?.elements || []).filter((e) => !hasLeftTheLeague(e.status, e.news));
+  const rankPriors = preSeason ? new Map() : buildRankPriors(elements, baseline);
 
   const players = elements.map((e) => {
     const total = Number(e.total_points) || 0;
     const ppg = parseFloat(e.points_per_game) || 0;
     const form = parseFloat(e.form) || 0;
     const appearances = appearancesFrom(total, ppg, e.starts);
-    const playProbability = clamp(appearances / matchesSoFar, 0, 1);
+    const observedPlay = clamp(appearances / matchesSoFar, 0, 1);
 
     const prior = baseline?.[e.code] || null;
-    const weights = { rate: ppg > 0 ? SEASON_WEIGHTS.rate : 0, form: 0, prior: 0 };
-    if (!preSeason && currentEvent >= FORM_MIN_GAMEWEEKS && form > 0) weights.form = SEASON_WEIGHTS.form;
-    if (prior && Number(prior.pointsPerGame) > 0) {
-      // A rate built on one cameo is not a season's evidence: the prior earns
-      // its full weight at ten appearances and almost none below two, so a
-      // player who scored 7 in his only game does not carry that all autumn.
-      weights.prior = SEASON_WEIGHTS.prior * clamp((Number(prior.appearances) || 0) / 10, 0, 1);
-    }
+    let perFixture;
+    let playProbability;
+    let weights;
 
-    const totalWeight = weights.rate + weights.form + weights.prior;
-    const perFixture =
-      totalWeight > 0
-        ? (weights.rate * ppg + weights.form * form + weights.prior * (Number(prior?.pointsPerGame) || 0)) /
-          totalWeight
-        : 0;
+    if (preSeason) {
+      // Last season is still in the feed, so the rate is read straight from it
+      // with the captured baseline as a light cross-check.
+      weights = { rate: ppg > 0 ? SEASON_WEIGHTS.rate : 0, form: 0, prior: 0 };
+      if (prior && Number(prior.pointsPerGame) > 0) {
+        // A rate built on one cameo is not a season's evidence: the prior earns
+        // its full weight at ten appearances and almost none below two, so a
+        // player who scored 7 in his only game does not carry that all autumn.
+        weights.prior = SEASON_WEIGHTS.prior * clamp((Number(prior.appearances) || 0) / 10, 0, 1);
+      }
+      const totalWeight = weights.rate + weights.form + weights.prior;
+      perFixture =
+        totalWeight > 0
+          ? (weights.rate * ppg + weights.form * form + weights.prior * (Number(prior?.pointsPerGame) || 0)) /
+            totalWeight
+          : 0;
+      playProbability = observedPlay;
+    } else {
+      // In season, FPL's stats are only the gameweeks played so far, so the
+      // question is how much one, two, five gameweeks should outweigh what a
+      // player has been for years. The current rate earns trust with each
+      // appearance; the rest of the answer is the prior, which counts as
+      // RATE_SHRINK pseudo-appearances at last season's level. That level is
+      // the captured baseline where it says enough, topped up for thin or
+      // missing records (promotions, summer signings) by the rate of the
+      // same-draft-ranked player at the position.
+      const seasonWeightRate = ppg > 0 ? SEASON_WEIGHTS.rate : 0;
+      const seasonWeightForm = currentEvent >= FORM_MIN_GAMEWEEKS && form > 0 ? SEASON_WEIGHTS.form : 0;
+      const seasonTotal = seasonWeightRate + seasonWeightForm;
+      const seasonSignal = seasonTotal > 0 ? (seasonWeightRate * ppg + seasonWeightForm * form) / seasonTotal : 0;
+
+      const baselineQuality = clamp((Number(prior?.appearances) || 0) / 10, 0, 1);
+      const personalRate = Number(prior?.pointsPerGame) || 0;
+      const personalPlay = clamp((Number(prior?.appearances) || 0) / GAMEWEEKS_IN_SEASON, 0, 1);
+      const rankPrior = rankPriors.get(e.id) || null;
+      // How sure the prior itself is: a full personal season, or a rank match
+      // to stand in for the part of the record that is missing.
+      const priorStrength = rankPrior ? 1 : baselineQuality;
+      const priorRate = rankPrior
+        ? baselineQuality * personalRate + (1 - baselineQuality) * rankPrior.rate
+        : personalRate;
+      const priorPlay = rankPrior
+        ? baselineQuality * personalPlay + (1 - baselineQuality) * rankPrior.play
+        : personalPlay;
+
+      const pseudo = RATE_SHRINK * priorStrength;
+      perFixture =
+        appearances + pseudo > 0 ? (appearances * seasonSignal + pseudo * priorRate) / (appearances + pseudo) : 0;
+
+      const playPseudo = PLAY_SHRINK * priorStrength;
+      playProbability = clamp(
+        (matchesSoFar * observedPlay + playPseudo * priorPlay) / (matchesSoFar + playPseudo),
+        0,
+        1
+      );
+
+      const trust = appearances + pseudo > 0 ? appearances / (appearances + pseudo) : 1;
+      weights = {
+        rate: round2(trust * (seasonTotal > 0 ? seasonWeightRate / seasonTotal : 1)),
+        form: round2(trust * (seasonTotal > 0 ? seasonWeightForm / seasonTotal : 0)),
+        prior: round2(1 - trust),
+      };
+    }
 
     // What past gameweeks say this position's projections are worth. Neutral
     // until there is enough evidence to say otherwise.

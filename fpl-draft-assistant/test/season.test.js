@@ -157,7 +157,7 @@ test("form is ignored until it means something, then it counts", () => {
     { fixtureContext: contextFor(9, 5), currentEvent: 8 }
   );
   const laterPlayer = find(later, "Player");
-  assert.equal(laterPlayer.season.weights.form, SEASON_WEIGHTS.form);
+  assert.ok(laterPlayer.season.weights.form > 0, "eight gameweeks of form counts");
   assert.ok(laterPlayer.season.perFixture > 4, "a player in form should be marked up");
   assert.ok(laterPlayer.season.perFixture < 9, "but not all the way to the form figure");
 });
@@ -192,7 +192,9 @@ test("a pre-season baseline lifts an early-season projection towards last season
   assert.equal(withoutPrior.baselineAvailable, false);
   assert.equal(withPrior.baselineAvailable, true);
   assert.equal(withoutPrior.players[0].season.weights.prior, 0);
-  assert.equal(withPrior.players[0].season.weights.prior, SEASON_WEIGHTS.prior);
+  // One appearance against a full season behind the prior: the prior should
+  // carry most of the answer this early, not a token fraction of it.
+  assert.ok(withPrior.players[0].season.weights.prior > 0.5, "early season leans on the prior");
   assert.ok(
     withPrior.players[0].season.perFixture > withoutPrior.players[0].season.perFixture,
     "one good gameweek of history should not be the only evidence"
@@ -210,9 +212,48 @@ test("a thin prior counts for almost nothing", () => {
 
   const cameo = withPrior(1);
   const regular = withPrior(36);
-  assert.ok(cameo.weights.prior < SEASON_WEIGHTS.prior / 5, "one appearance is barely evidence");
-  assert.equal(regular.weights.prior, SEASON_WEIGHTS.prior, "a full season earns the full weight");
+  assert.ok(cameo.weights.prior < regular.weights.prior / 2, "one appearance is far weaker evidence than a season");
+  assert.ok(regular.weights.prior > 0.5, "a full season of prior carries the early weeks");
   assert.ok(regular.perFixture > cameo.perFixture, "the same rate counts for more with more football behind it");
+});
+
+test("one opening gameweek does not bury a proven player or crown a hot one", () => {
+  // The Wirtz problem: after gameweek 1 FPL's stats ARE gameweek 1, so a
+  // proven player's quiet afternoon became his whole projection.
+  const elements = [
+    element({ id: 1, code: 11, web_name: "Quiet", draft_rank: 1, total_points: 2, points_per_game: "2.0", starts: 1, form: "0.0" }),
+    element({ id: 2, code: 22, web_name: "Hot", draft_rank: 2, total_points: 12, points_per_game: "12.0", starts: 1, form: "0.0" }),
+  ];
+  const result = buildSeasonProjections(bootstrap(elements, { current: 1 }), {
+    fixtureContext: contextFor(2, 5),
+    currentEvent: 1,
+    baseline: { 11: { pointsPerGame: 5, appearances: 34 }, 22: { pointsPerGame: 5, appearances: 34 } },
+  });
+  const quiet = find(result, "Quiet").season;
+  const hot = find(result, "Hot").season;
+  assert.ok(quiet.perFixture > 4, "a quiet opener drops a 5-a-game player a little, not to 2");
+  assert.ok(hot.perFixture < 7, "a hot opener lifts him a little, not to 12");
+  assert.ok(hot.perFixture > quiet.perFixture, "the opener still counts for something");
+});
+
+test("a newcomer with no record is rated like his draft-rank peer, not his first afternoon", () => {
+  // A summer signing has no Premier League baseline. FPL still ranks him for
+  // the draft, so he borrows the same-ranked player's last-season level.
+  const elements = [
+    element({ id: 1, code: 11, web_name: "Veteran", draft_rank: 1, total_points: 6, points_per_game: "6.0", starts: 1, form: "0.0" }),
+    element({ id: 2, code: 22, web_name: "Signing", draft_rank: 2, total_points: 2, points_per_game: "2.0", starts: 1, form: "0.0" }),
+  ];
+  const result = buildSeasonProjections(bootstrap(elements, { current: 1 }), {
+    fixtureContext: contextFor(2, 5),
+    currentEvent: 1,
+    // Only the veteran has a baseline; the signing borrows the distribution.
+    baseline: { 11: { pointsPerGame: 6, appearances: 36 } },
+  });
+  const signing = find(result, "Signing").season;
+  assert.ok(signing.perFixture > 3.5, "one quiet afternoon is not his level");
+  assert.ok(signing.weights.prior > 0.5, "the borrowed prior carries the early weeks");
+  // And his minutes are not all-or-nothing off one gameweek either.
+  assert.ok(signing.playProbability > 0.5 && signing.playProbability <= 1);
 });
 
 test("flagged players are marked down and departed players are gone", () => {
