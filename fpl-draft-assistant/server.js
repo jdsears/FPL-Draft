@@ -1,5 +1,8 @@
 import express from "express";
 import path from "path";
+// Imported rather than taken from the global, which does not exist on Node 18:
+// the bare global crashed the whole process on every news sweep in production.
+import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "url";
 import {
   getBootstrap,
@@ -1104,20 +1107,24 @@ app.post("/api/chat", async (req, res) => {
   const thorough = req.body?.thorough === true;
 
   if (req.body?.background === true) {
-    sweepJobs();
-    const id = crypto.randomUUID();
-    const job = { status: "working", createdAt: Date.now(), progress: {} };
-    CHAT_JOBS.set(id, job);
-    runChat({ messages, context, thorough, onProgress: (p) => { job.progress = p; } })
-      .then((result) => {
-        job.status = "done";
-        job.result = result;
-      })
-      .catch((err) => {
-        job.status = "failed";
-        job.error = String(err.message || err);
-      });
-    return res.json({ jobId: id });
+    try {
+      sweepJobs();
+      const id = randomUUID();
+      const job = { status: "working", createdAt: Date.now(), progress: {} };
+      CHAT_JOBS.set(id, job);
+      runChat({ messages, context, thorough, onProgress: (p) => { job.progress = p; } })
+        .then((result) => {
+          job.status = "done";
+          job.result = result;
+        })
+        .catch((err) => {
+          job.status = "failed";
+          job.error = String(err.message || err);
+        });
+      return res.json({ jobId: id });
+    } catch (err) {
+      return res.status(500).json({ error: String(err.message || err) });
+    }
   }
 
   try {
@@ -1140,5 +1147,13 @@ app.get("/api/chat-job/:id", (req, res) => {
 const dist = path.join(__dirname, "client", "dist");
 app.use(express.static(dist));
 app.get("*", (_req, res) => res.sendFile(path.join(dist, "index.html")));
+
+// Express 4 does not catch a rejected async handler: without this, one
+// programming slip inside a route kills the whole process mid-request and the
+// host's edge reports a bare 502. Better one hung request and a loud log line
+// than a dead app.
+process.on("unhandledRejection", (err) => {
+  console.error("[unhandledRejection]", err);
+});
 
 app.listen(PORT, () => console.log(`FPL Draft Assistant running on port ${PORT}`));
