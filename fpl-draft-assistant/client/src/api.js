@@ -59,7 +59,7 @@ export async function sendChat(messages, context, options = {}) {
     body: JSON.stringify({ messages, context, thorough: options.thorough === true }),
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || `Chat failed (${res.status})`);
+  if (!res.ok) throw new Error(data.error || (isBlip(res.status) ? BLIP_MESSAGE : `Chat failed (${res.status})`));
   return normaliseChat(data);
 }
 
@@ -72,14 +72,42 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
  * both, and if the phone spends the sweep in a pocket the finished result is
  * still waiting server-side when it comes back.
  */
+// A 502 or 503 with no message of our own behind it is the host's edge
+// talking, which nearly always means the app is mid-redeploy for a minute.
+const isBlip = (status) => status === 502 || status === 503 || status === 504 || status === 429;
+const BLIP_MESSAGE = "The app looks like it is redeploying. Give it a minute and press the button again.";
+
+/** Start the job, riding out a redeploy blip rather than failing on it. */
+async function startChatJob(body) {
+  let lastError;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    if (attempt > 0) await sleep(attempt * 4000);
+    let res;
+    try {
+      res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+    } catch {
+      lastError = new Error(BLIP_MESSAGE);
+      continue;
+    }
+    const started = await res.json().catch(() => ({}));
+    if (res.ok && started.jobId) return started;
+    lastError = new Error(started.error || (isBlip(res.status) ? BLIP_MESSAGE : `Chat failed (${res.status})`));
+    if (!isBlip(res.status)) throw lastError;
+  }
+  throw lastError;
+}
+
 export async function sendChatJob(messages, context, options = {}) {
-  const res = await fetch("/api/chat", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ messages, context, thorough: options.thorough === true, background: true }),
+  const started = await startChatJob({
+    messages,
+    context,
+    thorough: options.thorough === true,
+    background: true,
   });
-  const started = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(started.error || `Chat failed (${res.status})`);
 
   const deadline = Date.now() + 6 * 60 * 1000;
   let misses = 0;
@@ -91,6 +119,12 @@ export async function sendChatJob(messages, context, options = {}) {
     } catch {
       // One dropped poll is a tunnel or a lock screen; a run of them is real.
       if (++misses >= 8) throw new Error("Lost contact while Nova was working. Try again.");
+      continue;
+    }
+    // The edge answering for a restarting app is a blip too, not a verdict on
+    // the job, which is waiting server-side.
+    if (isBlip(poll.status)) {
+      if (++misses >= 8) throw new Error(BLIP_MESSAGE);
       continue;
     }
     misses = 0;
