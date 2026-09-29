@@ -78,6 +78,9 @@ gameweek it is.
      searches per answer in chat, and up to eight per half of a full team news
      sweep from the My week button, which runs as two requests (your squad,
      then your opponent's) so a busy news day cannot time the whole sweep out.
+     On Claude 4.6 and later models (including the default) she filters the
+     results in code before reading them, so a sweep spends fewer tokens on
+     pages that turn out to be irrelevant; searches cost the same.
      A full sweep therefore costs a few pence. Every sweep round is logged in
      the Railway deploy logs as a `[chat]` line if you want to watch one work.
 4. **Get your link.** In Settings, under Networking, click "Generate Domain".

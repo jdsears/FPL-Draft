@@ -26,6 +26,7 @@ import { buildLearning, correctionsFrom, normaliseCorrections } from "./lib/lear
 import { buildAdjustments, buildNote, pruneNotes, INTEL_KINDS, describeNote } from "./lib/intel.js";
 import { mergeState } from "./lib/syncstore.js";
 import { readJson, writeJson, storageInfo } from "./lib/storage.js";
+import { webSearchTool, countSearches, containerId } from "./lib/websearch.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -40,9 +41,9 @@ const MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-5-5";
 // override to another model sends no thinking field.
 const THINKING = /^claude-sonnet-5-5\b/.test(MODEL) ? { type: "between_tools" } : undefined;
 // Nova's live web search. Set NOVA_WEB_SEARCH=off to answer from the model
-// alone; each search is billed to the owner's Anthropic key.
+// alone; each search is billed to the owner's Anthropic key. The tool
+// version depends on the model (see lib/websearch.js).
 const WEB_SEARCH_ENABLED = (process.env.NOVA_WEB_SEARCH || "on").toLowerCase() !== "off";
-const WEB_SEARCH_TOOL = { type: "web_search_20250305", name: "web_search", max_uses: 3 };
 
 // ---------- FPL data routes ----------
 
@@ -965,7 +966,7 @@ async function runChat({ messages, context, thorough, onProgress }) {
     // question, so the scout buttons ask for a bigger budget. Each search is
     // billed, which is why it is per request rather than always on.
     const tools = [INTEL_TOOL];
-    if (WEB_SEARCH_ENABLED) tools.push({ ...WEB_SEARCH_TOOL, max_uses: thorough ? 8 : 3 });
+    if (WEB_SEARCH_ENABLED) tools.push(webSearchTool(MODEL, thorough ? 8 : 3));
 
     const turns = messages.slice(-20).map((m) => ({
       role: m.role === "assistant" ? "assistant" : "user",
@@ -987,6 +988,7 @@ async function runChat({ messages, context, thorough, onProgress }) {
     const maxWork = thorough ? 8 : 4;
     const maxTotal = thorough ? 16 : 8;
     let work = 0;
+    let container;
     for (let iteration = 0; iteration < maxTotal && work < maxWork; iteration++) {
       const data = await callAnthropic({
         model: MODEL,
@@ -995,7 +997,9 @@ async function runChat({ messages, context, thorough, onProgress }) {
         system: buildSystemPrompt(context, { webSearch: WEB_SEARCH_ENABLED, notes: context?.notes }),
         tools,
         messages: turns,
+        ...(container && { container }),
       });
+      container = containerId(data, container);
       sources.push(...collectSources(data.content));
       reply = (data.content || [])
         .filter((b) => b.type === "text")
@@ -1004,7 +1008,7 @@ async function runChat({ messages, context, thorough, onProgress }) {
         .trim() || reply;
 
       const calls = (data.content || []).filter((b) => b.type === "tool_use" && b.name === INTEL_TOOL.name);
-      const searches = (data.content || []).filter((b) => b.type === "server_tool_use").length;
+      const searches = countSearches(data.content);
       // A line per round in the deploy logs, because a sweep that goes wrong in
       // production is otherwise invisible.
       console.log(
