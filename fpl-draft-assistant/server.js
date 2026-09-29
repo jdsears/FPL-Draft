@@ -33,7 +33,12 @@ app.use(express.json({ limit: "1mb" }));
 
 const PORT = process.env.PORT || 3000;
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || "";
-const MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-5";
+const MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-5-5";
+// Sonnet 5.5 thinks by default. Nova ran without thinking on Sonnet 4.5, so
+// keep it that way with between_tools (no up-front thinking; short notes
+// between tool calls only). Only Sonnet 5.5 accepts it, so an ANTHROPIC_MODEL
+// override to another model sends no thinking field.
+const THINKING = /^claude-sonnet-5-5\b/.test(MODEL) ? { type: "between_tools" } : undefined;
 // Nova's live web search. Set NOVA_WEB_SEARCH=off to answer from the model
 // alone; each search is billed to the owner's Anthropic key.
 const WEB_SEARCH_ENABLED = (process.env.NOVA_WEB_SEARCH || "on").toLowerCase() !== "off";
@@ -986,6 +991,7 @@ async function runChat({ messages, context, thorough, onProgress }) {
       const data = await callAnthropic({
         model: MODEL,
         max_tokens: thorough ? 4096 : 3072,
+        ...(THINKING && { thinking: THINKING }),
         system: buildSystemPrompt(context, { webSearch: WEB_SEARCH_ENABLED, notes: context?.notes }),
         tools,
         messages: turns,

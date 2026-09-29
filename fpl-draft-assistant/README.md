@@ -70,7 +70,7 @@ gameweek it is.
 3. **Add your API key.** In the Railway service, open Variables and add:
    - `ANTHROPIC_API_KEY` = your key from console.anthropic.com (needed for the
      AI chat; everything else works without it)
-   - `ANTHROPIC_MODEL` = optional, defaults to `claude-sonnet-4-5`
+   - `ANTHROPIC_MODEL` = optional, defaults to `claude-sonnet-5-5`
    - `NOVA_WEB_SEARCH` = optional, defaults to `on`. Set it to `off` to stop
      Nova searching the web. Each search she runs is billed per search on your
      own Anthropic key, on top of the usual message cost, so `off` is the
